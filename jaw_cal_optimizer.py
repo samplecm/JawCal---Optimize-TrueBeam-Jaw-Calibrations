@@ -11,54 +11,29 @@ import datetime
 
 def define_encoder_dict(unit=2):
     #this function initializes the dictionary of jaw positions --> encoder values. 
-    if unit ==2:
-        dic = {"x1": {}, "x2": {}, "y1": {}, "y2": {}}
-        x1_encoders = [-10392328,-9447005,-7556362,-5665714,-3775062,-1884423,6224,1896866,3787515,5678161,7568808,9459451]
-        x2_encoders = [10379812,9430975,7543303,5655622,3767945,1880269,-7408,-1895078,-3782756,-5670434,-7558110,-9445787]
-        y1_encoders = [-104111866,-9463164,-7565575,-5669020,-3775028,-1885116,-751,1876504,3745303,5604218,7451895,9287053]
-        y2_encoders = [-10418197,-9470543,-7575112,-5680798,-3789125,-1901604,-19725,1855044,3721277,5577576,7422601,9255056]
-
-        for v,val in enumerate([-1,0,2,4,6,8,10,12,14,16,18,20]):
-            dic["x1"][val] = {"encoder": x1_encoders[v], "pixel": -100}
-            dic["x2"][val] = {"encoder": x2_encoders[v], "pixel": -100}
-            dic["y1"][val] = {"encoder": y1_encoders[v], "pixel": -100}
-            dic["y2"][val] = {"encoder": y2_encoders[v], "pixel": -100}
-        return dic
-    elif unit==4: 
-        encoder_file = os.path.join(os.getcwd(), "u4_encoders.csv")
-        with open(encoder_file) as fp:
-            reader = csv.reader(fp)
-            csv_data_list = []
-            for row in reader:
-                csv_data_list.append(row)
-        dic = {"x1": {}, "x2": {}, "y1": {}, "y2": {}}
-        for row in csv_data_list[2:]:
-            dic["x1"][round(float(row[0]),1)] = {"encoder": int(row[1]), "pixel": -100}
-            dic["x2"][round(float(row[0]),1)] = {"encoder": int(row[3]), "pixel": -100}
-            dic["y1"][round(float(row[0]),1)] = {"encoder": int(row[5]), "pixel": -100}
-            dic["y2"][round(float(row[0]),1)] = {"encoder": int(row[7]), "pixel": -100}
-        
-        return dic
+    #it reads an encoder csv file and stores the encoder values in a dictionary with their approximate (machine - read) symmetric jaw value
+    encoder_file = os.path.join(os.getcwd(), f"u{unit}_encoders.csv")
+    with open(encoder_file) as fp:
+        reader = csv.reader(fp)
+        csv_data_list = []
+        for row in reader:
+            csv_data_list.append(row)
+    dic = {"x1": {}, "x2": {}, "y1": {}, "y2": {}}
+    for row in csv_data_list[2:]:
+        dic["x1"][round(float(row[0]),1)] = {"encoder": int(row[1]), "pixel": -100}
+        dic["x2"][round(float(row[0]),1)] = {"encoder": int(row[3]), "pixel": -100}
+        dic["y1"][round(float(row[0]),1)] = {"encoder": int(row[5]), "pixel": -100}
+        dic["y2"][round(float(row[0]),1)] = {"encoder": int(row[7]), "pixel": -100}
+    
+    return dic
 
 
 
 
 def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
-    #this function sorts the epid images used for creating the epid image/encoder correlation
+    #this function finds the epid pixels corresponding to each jaw position in img_dict, and then fits a curve to those pixel values with the jaw encoder readouts
 
-    imgs = {"x1": {}, "x2": {}, "y1": {}, "y2": {}}    #initiate the image dictionary
-    encoder_dic = define_encoder_dict(unit_num)
-    y1_pixels = []   #the actual pixel location of the border
-    y1_displacements = []    #the collimator position readout
-
-    x1_pixels = []   #the actual pixel location of the border
-    x1_displacements = []
-
-    y2_pixels = []   #the actual pixel location of the border
-    y2_displacements = []
-
-    x2_pixels = []   #the actual pixel location of the border
-    x2_displacements = []
+    encoder_dic = define_encoder_dict(unit_num)   #initialize dictionary which will hold jaw positions, encoders, pixels
 
     iso = find_bead_location(img_dict[0]["iso"], round_final=True)    #first get the pixel position of the isocentre
 
@@ -69,113 +44,41 @@ def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
         img = img / np.amax(img)    #normalize image
         img = gaussian_filter(img, sigma=2, order=0)    #smoothen the image
         img = zoom(img, zoom=2, order=2)
+
+        #x1:
+        x1_profile = img[iso[0], 0:1500]
+        #determine centre as pixel with sharpest gradient
+        x1_profile_grad = np.gradient(x1_profile)
+        x1_pixel = np.argmax(x1_profile_grad)
+        x1_displacement = round((round(-4*(x1_pixel - iso[1]) * 0.0336/2)/2),1)  #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        encoder_dic["x1"][x1_displacement]["pixel"] = x1_pixel
         
+        #x2:
+        x2_profile = img[iso[0], 1000:-1]
+        #determine centre as pixel with sharpest gradient
+        x2_profile_grad = np.gradient(x2_profile)
+        x2_pixel = np.argmin(x2_profile_grad)+1000
+        x2_displacement = round((round(4*(x2_pixel - iso[1]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        encoder_dic["x2"][x2_displacement]["pixel"] = x2_pixel
 
-        #now need to go through and determine the pixel position of each jaw.  
-        if unit_num == 2:
-            #x1:
-            x1_profile = img[iso[0], 0:1500]
-            #determine centre as pixel with sharpest gradient
-            x1_profile_grad = np.gradient(x1_profile)
-            x1_pixel = np.argmax(x1_profile_grad)
-            x1_displacement = round(-(x1_pixel - iso[1]) * 0.0336/2)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            x1_pixels.append(x1_pixel)
-            x1_displacements.append(x1_displacement)
-            encoder_dic["x1"][x1_displacement]["pixel"] = x1_pixel
-            #x2:
+        #y1:
+        y1_profile = img[1000:-1, iso[1]]
+        #determine centre as pixel with sharpest gradient
+        y1_profile_grad = np.gradient(y1_profile)
+        y1_pixel = np.argmin(y1_profile_grad)+1000
+        y1_displacement = round((round(4*(y1_pixel - iso[0]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        encoder_dic["y1"][y1_displacement]["pixel"] = y1_pixel
 
-            x2_profile = img[iso[0], 1000:-1]
-            #determine centre as pixel with sharpest gradient
-            x2_profile_grad = np.gradient(x2_profile)
-            x2_pixel = np.argmin(x2_profile_grad)+1000
-            x2_displacement = round((x2_pixel - iso[1]) * 0.0336/2)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            x2_pixels.append(x2_pixel)
-            x2_displacements.append(x2_displacement)
-            encoder_dic["x2"][x2_displacement]["pixel"] = x2_pixel
+        #y2:
+        y2_profile = img[0:1500, iso[1]]
+        #determine centre as pixel with sharpest gradient
+        y2_profile_grad = np.gradient(y2_profile)
+        y2_pixel = np.argmax(y2_profile_grad)
+        y2_displacement = round((round(-4*(y2_pixel - iso[0]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        encoder_dic["y2"][y2_displacement]["pixel"] = y2_pixel
 
-            #y1:
-            y1_profile = img[1000:-1, iso[1]]
-            #determine centre as pixel with sharpest gradient
-            y1_profile_grad = np.gradient(y1_profile)
-            y1_pixel = np.argmin(y1_profile_grad)+1000
-            y1_displacement = round((y1_pixel - iso[0]) * 0.0336/2)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            y1_pixels.append(y1_pixel)
-            y1_displacements.append(y1_displacement)
-            try:
-                encoder_dic["y1"][y1_displacement]["pixel"] = y1_pixel
-            except KeyError:
-                # plt.plot(y1_profile)
-                # plt.show(block=True)
-                print("Omitting a jaw value that wasn't in the set up dictionary values.")
     
-            #y2:
-
-            y2_profile = img[0:1500, iso[1]]
-            #determine centre as pixel with sharpest gradient
-            y2_profile_grad = np.gradient(y2_profile)
-            y2_pixel = np.argmax(y2_profile_grad)
-            y2_displacement = round(-(y2_pixel - iso[0]) * 0.0336/2)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            y2_pixels.append(y2_pixel)
-            y2_displacements.append(y2_displacement)
-            try:
-                encoder_dic["y2"][y2_displacement]["pixel"] = y2_pixel
-            except KeyError:
-                # plt.plot(y1_profile)
-                # plt.show(block=True)
-                print("Omitting a jaw value that wasn't in the set up dictionary values.")
-        elif unit_num == 4:
-             #x1:
-            x1_profile = img[iso[0], 0:1500]
-            #determine centre as pixel with sharpest gradient
-            x1_profile_grad = np.gradient(x1_profile)
-            x1_pixel = np.argmax(x1_profile_grad)
-            x1_displacement = round((round(-4*(x1_pixel - iso[1]) * 0.0336/2)/2),1)  #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            x1_pixels.append(x1_pixel)
-            x1_displacements.append(x1_displacement)
-            encoder_dic["x1"][x1_displacement]["pixel"] = x1_pixel
-            #x2:
-
-            x2_profile = img[iso[0], 1000:-1]
-            #determine centre as pixel with sharpest gradient
-            x2_profile_grad = np.gradient(x2_profile)
-            x2_pixel = np.argmin(x2_profile_grad)+1000
-            x2_displacement = round((round(4*(x2_pixel - iso[1]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            x2_pixels.append(x2_pixel)
-            x2_displacements.append(x2_displacement)
-            encoder_dic["x2"][x2_displacement]["pixel"] = x2_pixel
-
-            #y1:
-            y1_profile = img[1000:-1, iso[1]]
-            #determine centre as pixel with sharpest gradient
-            y1_profile_grad = np.gradient(y1_profile)
-            y1_pixel = np.argmin(y1_profile_grad)+1000
-            y1_displacement = round((round(4*(y1_pixel - iso[0]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            y1_pixels.append(y1_pixel)
-            y1_displacements.append(y1_displacement)
-            try:
-                encoder_dic["y1"][y1_displacement]["pixel"] = y1_pixel
-            except KeyError:
-                # plt.plot(y1_profile)
-                # plt.show(block=True)
-                print("Omitting a jaw value that wasn't in the set up dictionary values.")
-    
-            #y2:
-
-            y2_profile = img[0:1500, iso[1]]
-            #determine centre as pixel with sharpest gradient
-            y2_profile_grad = np.gradient(y2_profile)
-            y2_pixel = np.argmax(y2_profile_grad)
-            y2_displacement = round((round(-4*(y2_pixel - iso[0]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-            y2_pixels.append(y2_pixel)
-            y2_displacements.append(y2_displacement)
-            try:
-                encoder_dic["y2"][y2_displacement]["pixel"] = y2_pixel
-            except KeyError:
-                # plt.plot(y1_profile)
-                # plt.show(block=True)
-                print("Omitting a jaw value that wasn't in the set up dictionary values.")
     #now want to fit cubic functions of each jaws pixel vs encoder value. 
-    pixel_encoder_predictions = []
     fig, ax = plt.subplots(nrows=4, ncols=1)
     for j, jaw in enumerate(["x1", "x2", "y1", "y2"]):
         encoders = []
@@ -208,13 +111,13 @@ def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
         iso = find_bead_location(img_dict[0]["iso"], round_final=False) #get unrounded iso
         p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit)
         if j == 0:
-            ax[j].text(100, -1.2e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(100, -1.4e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 1:
-            ax[j].text(1200, 0.8e7,f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(1300, 0.5e7,f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 2:
-            ax[j].text(1300, -1.5e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(1300, -0.5e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 3:
-            ax[j].text(100, -1e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(100, -1.5e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots"))
     plt.show(block=True)
     
@@ -869,7 +772,7 @@ def calculate_offsets(unit_num, img_folder):
 unit_num=4
 junction_priority=0.6
 #encoder_dic = define_encoder_dict(unit_num)
-img_folder = os.path.join(os.getcwd(), f"U{unit_num}_sep29_precal")
+img_folder = os.path.join(os.getcwd(), f"U{unit_num}_sep29_postcal")
 enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_sep29_encoders")
 
 predict_optimal_encoders(unit_num=unit_num, junction_priority=junction_priority, img_folder=img_folder, enc_img_folder=enc_img_folder)
