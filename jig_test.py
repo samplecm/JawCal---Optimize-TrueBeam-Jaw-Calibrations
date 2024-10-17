@@ -13,6 +13,8 @@ def get_bb_and_jaw_location(image, open_field=False):
     if open_field == True:    #in this case there are two bbs in vertical column at centre axis
         #first find top bb:
         img = deepcopy(image)
+
+        #threshold the image to facilitate object finding
         img[:,:round(4*img_size/9)] = 1
         img[:,round(5*img_size/9):] = 1
         img[:round(img_size/5),:] = 1
@@ -27,11 +29,11 @@ def get_bb_and_jaw_location(image, open_field=False):
 
 
         pixel_list = sorted(top_img.flatten().tolist())   #define bb by minimum 500 pixels centre of mass
-        pixel_500 = pixel_list[500]
+        pixel_500 = pixel_list[400]
         top_img[top_img > pixel_500] = 0
 
         pixel_list = sorted(bottom_img.flatten().tolist())
-        pixel_500 = pixel_list[500]
+        pixel_500 = pixel_list[400]
         bottom_img[bottom_img > pixel_500] = 0
 
         top_location = np.mean(np.nonzero(top_img), axis=1)
@@ -54,6 +56,9 @@ def get_bb_and_jaw_location(image, open_field=False):
             grad_profile = np.gradient(profile)
             jaw_pixel = np.argmin(grad_profile) + round(3*img_size/7)
 
+            plt.plot(grad_profile)
+            plt.show()
+
             #now filter for finding find the bb
             img[:,:round(4*img_size/9)] = 1
             img[:,round(5*img_size/9):] = 1
@@ -68,6 +73,10 @@ def get_bb_and_jaw_location(image, open_field=False):
             profile = img[:round(4*img_size/7),round(img_size/2)]
             grad_profile = np.gradient(profile)
             jaw_pixel = np.argmax(grad_profile)
+
+            plt.plot(grad_profile)
+            plt.show()
+
             #now filter for finding find the bb
             img[:,:round(4*img_size/9)] = 1
             img[:,round(5*img_size/9):] = 1
@@ -77,12 +86,12 @@ def get_bb_and_jaw_location(image, open_field=False):
             
 
         pixel_list = sorted(img.flatten().tolist())   #define bb by minimum 500 pixels centre of mass
-        pixel_500 = pixel_list[500]
+        pixel_500 = pixel_list[400]
         img[img > pixel_500] = 0
 
         bb_location = np.mean(np.nonzero(img), axis=1)
 
-        # plt.imshow(image)
+        # plt.imshow(img)
         # plt.show(block=True)
 
         return bb_location, jaw_pixel
@@ -134,22 +143,22 @@ def get_jaw_matching_jig_data(images):
             raise Exception(f"{key} image not found, unable to proceed with QA.")
     #now need to calculate the junctions
     junctions = {}
-    junctions["j_0_310"] = jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["lt_cw_310"] - jaw_matching_qa_data["sc1_open"]
-    junctions["j_0_130"] = jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["lt_cw_130"] - jaw_matching_qa_data["sc1_open"]
+    junctions["j_0_310"] = -(jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["lt_cw_310"] - jaw_matching_qa_data["sc1_open"])
+    junctions["j_0_130"] = -(jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["lt_cw_130"] - jaw_matching_qa_data["sc1_open"])
 
-    junctions["j_180_310"] = jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["lt_cw_310"] - jaw_matching_qa_data["sc1_open"]
-    junctions["j_180_130"] = jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["lt_cw_130"] - jaw_matching_qa_data["sc1_open"]
+    junctions["j_180_310"] = -(jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["lt_cw_310"] - jaw_matching_qa_data["sc1_open"])
+    junctions["j_180_130"] = -(jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["lt_cw_130"] - jaw_matching_qa_data["sc1_open"])
 
-    junctions["j_0_50"] = jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["rt_cw_50"] - jaw_matching_qa_data["sc1_open"]
-    junctions["j_0_230"] = jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["rt_cw_230"] - jaw_matching_qa_data["sc1_open"]
+    junctions["j_0_50"] = -(jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["rt_cw_50"] - jaw_matching_qa_data["sc1_open"])
+    junctions["j_0_230"] = -(jaw_matching_qa_data["sc2_0"] + jaw_matching_qa_data["rt_cw_230"] - jaw_matching_qa_data["sc1_open"])
 
-    junctions["j_180_50"] = jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["rt_cw_50"] - jaw_matching_qa_data["sc1_open"]
-    junctions["j_180_230"] = jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["rt_cw_230"] - jaw_matching_qa_data["sc1_open"]
+    junctions["j_180_50"] = -(jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["rt_cw_50"] - jaw_matching_qa_data["sc1_open"])
+    junctions["j_180_230"] = -(jaw_matching_qa_data["sc3_180"] + jaw_matching_qa_data["rt_cw_230"] - jaw_matching_qa_data["sc1_open"])
 
     juncs = []
     for junc in junctions.keys():
         juncs.append(np.abs(junctions[junc]))
-        median_junc = np.median(juncs)
+
 
     return jaw_matching_qa_data, junctions
 
@@ -171,7 +180,7 @@ def sort_image_dict(img_folder : str):
         img[:,-20:] = 0
 
         img = img / np.percentile(img, 90)    #normalize image
-        img = gaussian_filter(img, sigma=1, order=0)    #smoothen the image
+        img = gaussian_filter(img, sigma=2, order=0)    #smoothen the image
         img = zoom(img, zoom=2, order=1)
         # jaws = img_meta[0x3002,0x0030].value[0][0x300A, 0x00B6][0]
         
@@ -233,7 +242,7 @@ def sort_image_dict(img_folder : str):
 
 
 unit_num = 2
-img_folder = "U:/Profile/Desktop/Abbotsford_Physics_Residency/Projects/Jaw Matching/Caleb/jig_tests/u2_sep27_post"
+img_folder = "U:/Profile/Desktop/Abbotsford_Physics_Residency/Projects/Jaw Matching/Caleb/jig_tests/2024 09 13"
 
 
 #first collect imgs:

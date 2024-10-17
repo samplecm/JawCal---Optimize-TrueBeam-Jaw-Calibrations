@@ -30,12 +30,18 @@ def define_encoder_dict(unit=2):
 
 
 
-def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
+def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
     #this function finds the epid pixels corresponding to each jaw position in img_dict, and then fits a curve to those pixel values with the jaw encoder readouts
 
     encoder_dic = define_encoder_dict(unit_num)   #initialize dictionary which will hold jaw positions, encoders, pixels
 
-    iso = find_bead_location(img_dict[0]["iso"], round_final=True)    #first get the pixel position of the isocentre
+    #get iso img
+    img_meta = pydicom.dcmread(iso_img_path)
+    img = img_meta.pixel_array
+    img = img / np.amax(img)    #normalize image
+    img = gaussian_filter(img, sigma=1, order=0)    #smoothen the image
+    iso_img = zoom(img, zoom=2, order=2)
+    iso = find_bead_location(iso_img, round_final=True)    #first get the pixel position of the isocentre
 
     for img_path in sorted(os.listdir(img_folder)):
         img_path = os.path.join(img_folder, img_path)
@@ -50,15 +56,17 @@ def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
         #determine centre as pixel with sharpest gradient
         x1_profile_grad = np.gradient(x1_profile)
         x1_pixel = np.argmax(x1_profile_grad)
-        x1_displacement = round((round(-4*(x1_pixel - iso[1]) * 0.0336/2)/2),1)  #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        x1_displacement = round((round(-4*(x1_pixel - iso[1]) * 0.0286/2)/2),1)  #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+   
         encoder_dic["x1"][x1_displacement]["pixel"] = x1_pixel
+
         
         #x2:
         x2_profile = img[iso[0], 1000:-1]
         #determine centre as pixel with sharpest gradient
         x2_profile_grad = np.gradient(x2_profile)
         x2_pixel = np.argmin(x2_profile_grad)+1000
-        x2_displacement = round((round(4*(x2_pixel - iso[1]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        x2_displacement = round((round(4*(x2_pixel - iso[1]) * 0.0286/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
         encoder_dic["x2"][x2_displacement]["pixel"] = x2_pixel
 
         #y1:
@@ -66,7 +74,7 @@ def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
         #determine centre as pixel with sharpest gradient
         y1_profile_grad = np.gradient(y1_profile)
         y1_pixel = np.argmin(y1_profile_grad)+1000
-        y1_displacement = round((round(4*(y1_pixel - iso[0]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        y1_displacement = round((round(4*(y1_pixel - iso[0]) * 0.0286/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
         encoder_dic["y1"][y1_displacement]["pixel"] = y1_pixel
 
         #y2:
@@ -74,8 +82,12 @@ def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
         #determine centre as pixel with sharpest gradient
         y2_profile_grad = np.gradient(y2_profile)
         y2_pixel = np.argmax(y2_profile_grad)
-        y2_displacement = round((round(-4*(y2_pixel - iso[0]) * 0.0336/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
-        encoder_dic["y2"][y2_displacement]["pixel"] = y2_pixel
+        y2_displacement = round((round(-4*(y2_pixel - iso[0]) * 0.0286/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        try:
+            encoder_dic["y2"][y2_displacement]["pixel"] = y2_pixel
+        except:
+            encoder_dic["y2"][y1_displacement]["pixel"] = y2_pixel
+
 
     
     #now want to fit cubic functions of each jaws pixel vs encoder value. 
@@ -108,7 +120,7 @@ def fit_encoder_vs_pixel_funcs(img_folder, img_dict, unit_num, optimal_cal):
         ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
 
         #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
-        iso = find_bead_location(img_dict[0]["iso"], round_final=False) #get unrounded iso
+        iso = find_bead_location(iso_img, round_final=False) #get unrounded iso
         p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit)
         if j == 0:
             ax[j].text(100, -1.4e7, f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
@@ -130,29 +142,29 @@ def predict_opt_cal_locations(iso, jaw, optimal_cal, fit):
 
     #first get the jaw positions in pixels, relative to origin.
     if jaw == "x1":
-        origin = iso[1] - optimal_cal[0]*2/0.336
-        p1 = origin - (2/0.0336)
-        p5 = origin - 5*(2/0.0336)
-        p9 = origin - 9*(2/0.0336)
-        p19 = origin - 19*(2/0.0336)
+        origin = iso[1] - optimal_cal[0]*2/0.286    #optimal_cal in millimetres
+        p1 = origin - (2/0.0286)
+        p5 = origin - 5*(2/0.0286)
+        p9 = origin - 9*(2/0.0286)
+        p19 = origin - 19*(2/0.0286)
     if jaw == "x2":
-        origin = iso[1] + optimal_cal[1]*2/0.336
-        p1 = origin + (2/0.0336)
-        p5 = origin + 5*(2/0.0336)
-        p9 = origin + 9*(2/0.0336)
-        p19 = origin + 19*(2/0.0336)
+        origin = iso[1] + optimal_cal[1]*2/0.286
+        p1 = origin + (2/0.0286)
+        p5 = origin + 5*(2/0.0286)
+        p9 = origin + 9*(2/0.0286)
+        p19 = origin + 19*(2/0.0286)
     if jaw == "y1":
-        origin = iso[0] + optimal_cal[2]*2/0.336
-        p1 = origin + (2/0.0336)
-        p5 = origin + 5*(2/0.0336)
-        p9 = origin + 9*(2/0.0336)
-        p19 = origin + 19*(2/0.0336)
+        origin = iso[0] + optimal_cal[2]*2/0.286
+        p1 = origin + (2/0.0286)
+        p5 = origin + 5*(2/0.0286)
+        p9 = origin + 9*(2/0.0286)
+        p19 = origin + 19*(2/0.0286)
     if jaw == "y2":
-        origin = iso[0] - optimal_cal[3]*2/0.336
-        p1 = origin - (2/0.0336)
-        p5 = origin - 5*(2/0.0336)
-        p9 = origin - 9*(2/0.0336)
-        p19 = origin - 19*(2/0.0336)
+        origin = iso[0] - optimal_cal[3]*2/0.286
+        p1 = origin - (2/0.0286)
+        p5 = origin - 5*(2/0.0286)
+        p9 = origin - 9*(2/0.0286)
+        p19 = origin - 19*(2/0.0286)
 
     p1 = fit[0]*p1**3 + fit[1]*p1**2 + fit[2]*p1 + fit[3]
     p5 = fit[0]*p5**3 + fit[1]*p5**2 + fit[2]*p5 + fit[3]
@@ -191,10 +203,15 @@ def sort_image_dict(img_folder : str):
 
         imager_location = round(float(img_meta[0x3002, 0x000D].value[2]))    #get location of EPID receptor panel
 
+        #old method (when position 0 was used for other images)
+        #
+        #
         #if epid location is at -500, image is of the cube phantom with the bb to demark isocentre
-        if imager_location == -500:
-            imgs[gantry_angle]["iso"] = img   #using same image for both coll rotations... isocentre defined by bb over epid
-            continue
+        # if imager_location == -500:
+        #     imgs[gantry_angle]["iso"] = img   #using same image for both coll rotations... isocentre defined by bb over epid
+        #     continue
+        #
+        #
         
         #collimator positions not included in metadata, so determine closed jaw from lowest mean pixel intensity in each quarter blocked region
         y_range, x_range = img.shape
@@ -202,6 +219,12 @@ def sort_image_dict(img_folder : str):
         mean_blocked_pixels = [np.mean(img[:, :int(x_range/2)]), np.mean(img[:, int(x_range/2):]), np.mean(img[:int(x_range/2), :]), np.mean(img[int(x_range/2):, :])]    #C0: x1, x2, y2, y1 / C90: y2, y1, x2, x1 
         
         min_region_index = np.argmin(mean_blocked_pixels)
+        
+        #if field is symmetric, then it is the isocentre image (no closed jaws)
+        if (np.amin(mean_blocked_pixels)/np.amax(mean_blocked_pixels)) > 0.6: 
+            imgs[gantry_angle]["iso"] = img
+            continue
+
         blocked_field = ""
 
         if coll_angle == 0:
@@ -259,25 +282,25 @@ def get_jaw_offsets(img_dict, unit_num):
         y1_profile = img_dict[g][0]["y1"][:, isocentre[1]]
         #determine centre as pixel with sharpest gradient
         y1_profile_grad = np.gradient(y1_profile)
-        y1_offset = (np.argmin(y1_profile_grad) - isocentre[0]) * 0.336/2   #make negative to follow sign convention (positive if jaw openy)     
+        y1_offset = (np.argmin(y1_profile_grad) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw openy)     
         offset_dict[g][0]["y1"] = y1_offset 
 
         #repeat for y2 jaw
         y2_profile = img_dict[g][0]["y2"][:, isocentre[1]]
         y2_profile_grad = np.gradient(y2_profile)
-        y2_offset = -(np.argmax(y2_profile_grad) - isocentre[0])* 0.336/2
+        y2_offset = -(np.argmax(y2_profile_grad) - isocentre[0])* 0.224/2
         offset_dict[g][0]["y2"] = y2_offset 
 
         #repeat for x1 jaw
         x1_profile = img_dict[g][0]["x1"][isocentre[0], :]
         x1_profile_grad = np.gradient(x1_profile)
-        x1_offset = -(np.argmax(x1_profile_grad) - isocentre[1])* 0.336/2
+        x1_offset = -(np.argmax(x1_profile_grad) - isocentre[1])* 0.224/2
         offset_dict[g][0]["x1"] = x1_offset  
 
         #repeat for x2 jaw
         x2_profile = img_dict[g][0]["x2"][isocentre[0], :]
         x2_profile_grad = np.gradient(x2_profile)
-        x2_offset = (np.argmin(x2_profile_grad) - isocentre[1])* 0.336/2
+        x2_offset = (np.argmin(x2_profile_grad) - isocentre[1])* 0.224/2
         offset_dict[g][0]["x2"] = x2_offset 
 
 
@@ -315,25 +338,25 @@ def get_jaw_offsets(img_dict, unit_num):
         x1_profile = img_dict[g][90]["x1"][:, isocentre[1]]
         #determine centre as pixel with sharpest gradient
         x1_profile_grad = np.gradient(x1_profile)
-        x1_offset = (np.argmin(x1_profile_grad) - isocentre[0])* 0.336/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)
+        x1_offset = (np.argmin(x1_profile_grad) - isocentre[0])* 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)
         offset_dict[g][90]["x1"] = x1_offset
 
         #repeat for y2 jaw
         x2_profile = img_dict[g][90]["x2"][:, isocentre[1]]
         x2_profile_grad = np.gradient(x2_profile)
-        x2_offset = -(np.argmax(x2_profile_grad) - isocentre[0])* 0.336/2
+        x2_offset = -(np.argmax(x2_profile_grad) - isocentre[0])* 0.224/2
         offset_dict[g][90]["x2"] = x2_offset 
 
         #repeat for x1 jaw
         y2_profile = img_dict[g][90]["y2"][isocentre[0], :]
         y2_profile_grad = np.gradient(y2_profile)
-        y2_offset = -(np.argmax(y2_profile_grad) - isocentre[1])* 0.336/2
+        y2_offset = -(np.argmax(y2_profile_grad) - isocentre[1])* 0.224/2
         offset_dict[g][90]["y2"] = y2_offset
 
         #repeat for x2 jaw
         y1_profile = img_dict[g][90]["y1"][isocentre[0], :]
         y1_profile_grad = np.gradient(y1_profile)
-        y1_offset = (np.argmin(y1_profile_grad) - isocentre[1])* 0.336/2
+        y1_offset = (np.argmin(y1_profile_grad) - isocentre[1])* 0.224/2
         offset_dict[g][90]["y1"] = y1_offset 
 
 
@@ -371,25 +394,25 @@ def get_jaw_offsets(img_dict, unit_num):
         x2_profile = img_dict[g][270]["x2"][:, isocentre[1]]
         #determine centre as pixel with sharpest gradient
         x2_profile_grad = np.gradient(x2_profile)
-        x2_offset = (np.argmin(x2_profile_grad) - isocentre[0]) * 0.336/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        x2_offset = (np.argmin(x2_profile_grad) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
         offset_dict[g][270]["x2"] = x2_offset 
 
         #repeat for x1 jaw
         x1_profile = img_dict[g][270]["x1"][:, isocentre[1]]
         x1_profile_grad = np.gradient(x1_profile)
-        x1_offset = -(np.argmax(x1_profile_grad) - isocentre[0])* 0.336/2
+        x1_offset = -(np.argmax(x1_profile_grad) - isocentre[0])* 0.224/2
         offset_dict[g][270]["x1"] = x1_offset 
 
         #repeat for y1 jaw
         y1_profile = img_dict[g][270]["y1"][isocentre[0], :]
         y1_profile_grad = np.gradient(y1_profile)
-        y1_offset = -(np.argmax(y1_profile_grad) - isocentre[1])* 0.336/2
+        y1_offset = -(np.argmax(y1_profile_grad) - isocentre[1])* 0.224/2
         offset_dict[g][270]["y1"] = y1_offset  
 
         #repeat for y2 jaw
         y2_profile = img_dict[g][270]["y2"][isocentre[0], :]
         y2_profile_grad = np.gradient(y2_profile)
-        y2_offset = (np.argmin(y2_profile_grad) - isocentre[1])* 0.336/2
+        y2_offset = (np.argmin(y2_profile_grad) - isocentre[1])* 0.224/2
         offset_dict[g][270]["y2"] = y2_offset 
 
 
@@ -747,7 +770,9 @@ def predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_fo
 
     #first collect imgs:
     img_dict = sort_image_dict(img_folder)
+    iso_img_path = os.path.join(os.getcwd(), "U4_encoder_iso_oct07.dcm")
 
+    #fit_encoder_vs_pixel_funcs(enc_img_folder, iso_img_path, unit_num=unit_num, optimal_cal=[0.1, 0.5, -0.5, 0])
     # #now want to define the offset of each 1/4 blocked beam's jaw from isocentre at each gantry/collimator combination
     offsets = get_jaw_offsets(img_dict, unit_num)
 
@@ -758,7 +783,7 @@ def predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_fo
 
     #now get jaw images to use for encoder-jaw correlations
 
-    fit_encoder_vs_pixel_funcs(enc_img_folder, img_dict, unit_num=unit_num, optimal_cal=optimal_cal)
+    #fit_encoder_vs_pixel_funcs(enc_img_folder, iso_img_path, unit_num=unit_num, optimal_cal=optimal_cal)
 
 def calculate_offsets(unit_num, img_folder):
 
@@ -770,10 +795,13 @@ def calculate_offsets(unit_num, img_folder):
 
 
 unit_num=4
-junction_priority=0.6
+junction_priority=0.8
+
+
 #encoder_dic = define_encoder_dict(unit_num)
-img_folder = os.path.join(os.getcwd(), f"U{unit_num}_sep29_postcal")
-enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_sep29_encoders")
+img_folder = os.path.join(os.getcwd(), f"U{unit_num}_post_oct07")
+enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_Encoders_Oct7")
+
 
 predict_optimal_encoders(unit_num=unit_num, junction_priority=junction_priority, img_folder=img_folder, enc_img_folder=enc_img_folder)
 
