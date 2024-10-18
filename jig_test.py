@@ -29,17 +29,17 @@ def get_bb_and_jaw_location(image, open_field=False):
 
 
         pixel_list = sorted(top_img.flatten().tolist())   #define bb by minimum 500 pixels centre of mass
-        pixel_500 = pixel_list[400]
+        pixel_500 = pixel_list[4000]
         top_img[top_img > pixel_500] = 0
 
         pixel_list = sorted(bottom_img.flatten().tolist())
-        pixel_500 = pixel_list[400]
+        pixel_500 = pixel_list[4000]
         bottom_img[bottom_img > pixel_500] = 0
 
         top_location = np.mean(np.nonzero(top_img), axis=1)
         bottom_location = np.mean(np.nonzero(bottom_img), axis=1)
 
-        # fig, ax = plt.subplots(ncols=2)
+        fig, ax = plt.subplots(ncols=2)
         # ax[0].imshow(top_img)
         # ax[1].imshow(bottom_img)
 
@@ -54,10 +54,8 @@ def get_bb_and_jaw_location(image, open_field=False):
             #first get the jaw location
             profile = img[round(3*img_size/7):,round(img_size/2)]
             grad_profile = np.gradient(profile)
-            jaw_pixel = np.argmin(grad_profile) + round(3*img_size/7)
-
-            plt.plot(grad_profile)
-            plt.show()
+            jaw_pixel_old = np.argmin(grad_profile) + round(3*img_size/7)
+            jaw_pixel = np.argmin(abs(profile - 0.5)) + round(3*img_size/7)
 
             #now filter for finding find the bb
             img[:,:round(4*img_size/9)] = 1
@@ -72,11 +70,12 @@ def get_bb_and_jaw_location(image, open_field=False):
             #first get the jaw location
             profile = img[:round(4*img_size/7),round(img_size/2)]
             grad_profile = np.gradient(profile)
-            jaw_pixel = np.argmax(grad_profile)
+            jaw_pixel_old = np.argmax(grad_profile)
+            jaw_pixel = np.argmin(abs(profile - 0.5))
 
-            plt.plot(grad_profile)
-            plt.show()
-
+            # fig, ax = plt.subplots(nrows=1)
+            # ax[0].plot(profile)
+            # plt.show()
             #now filter for finding find the bb
             img[:,:round(4*img_size/9)] = 1
             img[:,round(5*img_size/9):] = 1
@@ -84,9 +83,10 @@ def get_bb_and_jaw_location(image, open_field=False):
             img[round(4*img_size/5):,:] = 1
 
             
+            
 
         pixel_list = sorted(img.flatten().tolist())   #define bb by minimum 500 pixels centre of mass
-        pixel_500 = pixel_list[400]
+        pixel_500 = pixel_list[4000]
         img[img > pixel_500] = 0
 
         bb_location = np.mean(np.nonzero(img), axis=1)
@@ -123,14 +123,14 @@ def get_jaw_matching_jig_data(images):
                     bb_locations = get_bb_and_jaw_location(images[gantry][coll][blocked_field], open_field=True)
 
                     #get distance between BBs:
-                    bb_dist = abs(bb_locations[1] - bb_locations[0])*0.336/2 / 1.5
+                    bb_dist = abs(bb_locations[1] - bb_locations[0])*0.336/3 / 1.5
                     bb_dist = np.sqrt(bb_dist[0]**2 + bb_dist[1]**2)
                     jaw_matching_qa_data["sc1_open"] = bb_dist
                 else:
                     bb_location, jaw_location = get_bb_and_jaw_location(images[gantry][coll][blocked_field], open_field=False)
 
                     #need distance from bb to jaw
-                    dist = abs(jaw_location - bb_location[0])*0.336/2 / 1.5
+                    dist = abs(jaw_location - bb_location[0])*0.336/3/ 1.5
 
                     #now add to qa data dictionary 
                     for key in jaw_matching_qa_data.keys():
@@ -180,8 +180,10 @@ def sort_image_dict(img_folder : str):
         img[:,-20:] = 0
 
         img = img / np.percentile(img, 90)    #normalize image
-        img = gaussian_filter(img, sigma=2, order=0)    #smoothen the image
-        img = zoom(img, zoom=2, order=1)
+
+        img = gaussian_filter(img, sigma=6, order=0)    #smoothen the image
+        img = zoom(img, zoom=3, order=3)
+        
         # jaws = img_meta[0x3002,0x0030].value[0][0x300A, 0x00B6][0]
         
 
@@ -242,7 +244,7 @@ def sort_image_dict(img_folder : str):
 
 
 unit_num = 2
-img_folder = "U:/Profile/Desktop/Abbotsford_Physics_Residency/Projects/Jaw Matching/Caleb/jig_tests/2024 09 13"
+img_folder = "U:/Profile/Desktop/Abbotsford_Physics_Residency/Projects/Jaw Matching/Caleb/jig_tests/2024 05 28"
 
 
 #first collect imgs:
