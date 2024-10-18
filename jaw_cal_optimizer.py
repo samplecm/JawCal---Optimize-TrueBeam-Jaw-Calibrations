@@ -864,7 +864,7 @@ def calculate_offsets(unit_num, img_folder):
 
 
 unit_num=1
-junction_priority=0.6
+junction_priority=0.99
 
 
 #encoder_dic = define_encoder_dict(unit_num)

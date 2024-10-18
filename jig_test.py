@@ -243,11 +243,18 @@ def sort_image_dict(img_folder : str):
     return imgs
 
 
-unit_num = 2
-img_folder = "U:/Profile/Desktop/Abbotsford_Physics_Residency/Projects/Jaw Matching/Caleb/jig_tests/2024 05 28"
 
 
-#first collect imgs:
-img_dict = sort_image_dict(img_folder)
+def main(img_folder):
 
-bb_dists, junctions = get_jaw_matching_jig_data(img_dict)
+    #first collect imgs:
+    img_dict = sort_image_dict(img_folder)
+
+    #calculate junctions
+    offsets, junctions = get_jaw_matching_jig_data(img_dict)
+
+    return offsets, junctions
+
+if __name__ == "__main__":
+    img_folder = "U:/Profile/Desktop/Abbotsford_Physics_Residency/Projects/Jaw Matching/Caleb/jig_tests/2024 05 28"
+    offsets, junctions = main(img_folder)
