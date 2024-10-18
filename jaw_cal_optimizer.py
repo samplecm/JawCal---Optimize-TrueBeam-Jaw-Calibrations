@@ -84,8 +84,6 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
             try:
                 encoder_dic["x2"][(float(x2_displacement)-0.5)]["pixel"] = x2_pixel
             except:
-                plt.plot(x2_profile)
-                plt.show()
                 encoder_dic["x2"][(float(x2_displacement)+0.5)]["pixel"] = x2_pixel
 
         #y1:
@@ -168,7 +166,6 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
         if j == 3:
             ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots"))
-    plt.show(block=True)
     
         
     return
@@ -357,33 +354,33 @@ def get_jaw_offsets(img_dict, unit_num):
         offset_dict[g][0]["x2"] = x2_offset 
 
 
-        fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17, 17))
-        ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {0}$^\circ$")
-        ax[0,0].plot(y1_profile)
-        ax[0,1].plot(y1_profile_grad)
-        ax[0,2].imshow(img_dict[g][0]["y1"])
-        ax[0,0].text(1450, 0.8, f"Y1 Jaw offset = {round(y1_offset,3)} mm")    #pixel size 0.34 mm /2
+        # fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17, 17))
+        # ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {0}$^\circ$")
+        # ax[0,0].plot(y1_profile)
+        # ax[0,1].plot(y1_profile_grad)
+        # ax[0,2].imshow(img_dict[g][0]["y1"])
+        # ax[0,0].text(1450, 0.8, f"Y1 Jaw offset = {round(y1_offset,3)} mm")    #pixel size 0.34 mm /2
     
-        ax[1,0].plot(y2_profile)
-        ax[1,1].plot(y2_profile_grad)
-        ax[1,2].imshow(img_dict[g][0]["y2"])
-        ax[1,0].text(0, 0.8, f"Y2 Jaw offset = {round(y2_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[1,0].plot(y2_profile)
+        # ax[1,1].plot(y2_profile_grad)
+        # ax[1,2].imshow(img_dict[g][0]["y2"])
+        # ax[1,0].text(0, 0.8, f"Y2 Jaw offset = {round(y2_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        ax[2,0].plot(x1_profile)
-        ax[2,1].plot(x1_profile_grad)
-        ax[2,2].imshow(img_dict[g][0]["x1"])
-        ax[2,0].text(0, 0.8, f"X1 Jaw offset = {round(x1_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[2,0].plot(x1_profile)
+        # ax[2,1].plot(x1_profile_grad)
+        # ax[2,2].imshow(img_dict[g][0]["x1"])
+        # ax[2,0].text(0, 0.8, f"X1 Jaw offset = {round(x1_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        ax[3,0].plot(x2_profile)
-        ax[3,1].plot(x2_profile_grad)
-        ax[3,2].imshow(img_dict[g][0]["x2"])
-        ax[3,0].text(1450, 0.8, f"X2 Jaw offset = {round(x2_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[3,0].plot(x2_profile)
+        # ax[3,1].plot(x2_profile_grad)
+        # ax[3,2].imshow(img_dict[g][0]["x2"])
+        # ax[3,0].text(1450, 0.8, f"X2 Jaw offset = {round(x2_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"{g}_{0}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
+        #fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"{g}_{0}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
         #plt.show()
-        del fig
+        #del fig
 
-        plt.close()
+        #plt.close()
 
         #Now repeat for the c = 90 images from left counter clockwise - (y2, x1, x2, y1)
         isocentre = offset_dict[g]["iso"]
@@ -421,32 +418,32 @@ def get_jaw_offsets(img_dict, unit_num):
         offset_dict[g][90]["y1"] = y1_offset 
 
 
-        fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17,17))
+        # fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17,17))
         
-        ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {90}$^\circ$")
-        ax[0,0].plot(y1_profile)
-        ax[0,1].plot(y1_profile_grad)
-        ax[0,2].imshow(img_dict[g][90]["y1"])
-        ax[0,0].text(1450, 0.8, f"Y1 Jaw offset = {round(y1_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {90}$^\circ$")
+        # ax[0,0].plot(y1_profile)
+        # ax[0,1].plot(y1_profile_grad)
+        # ax[0,2].imshow(img_dict[g][90]["y1"])
+        # ax[0,0].text(1450, 0.8, f"Y1 Jaw offset = {round(y1_offset,3)} mm")    #pixel size 0.34 mm /2
     
-        ax[1,0].plot(y2_profile)
-        ax[1,1].plot(y2_profile_grad)
-        ax[1,2].imshow(img_dict[g][90]["y2"])
-        ax[1,0].text(0, 0.8, f"Y2 Jaw offset = {round(y2_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[1,0].plot(y2_profile)
+        # ax[1,1].plot(y2_profile_grad)
+        # ax[1,2].imshow(img_dict[g][90]["y2"])
+        # ax[1,0].text(0, 0.8, f"Y2 Jaw offset = {round(y2_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        ax[2,0].plot(x1_profile)
-        ax[2,1].plot(x1_profile_grad)
-        ax[2,2].imshow(img_dict[g][90]["x1"])
-        ax[2,0].text(1450, 0.8, f"X1 Jaw offset = {round(x1_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[2,0].plot(x1_profile)
+        # ax[2,1].plot(x1_profile_grad)
+        # ax[2,2].imshow(img_dict[g][90]["x1"])
+        # ax[2,0].text(1450, 0.8, f"X1 Jaw offset = {round(x1_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        ax[3,0].plot(x2_profile)
-        ax[3,1].plot(x2_profile_grad)
-        ax[3,2].imshow(img_dict[g][90]["x2"])
-        ax[3,0].text(0, 0.8, f"X2 Jaw offset = {round(x2_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[3,0].plot(x2_profile)
+        # ax[3,1].plot(x2_profile_grad)
+        # ax[3,2].imshow(img_dict[g][90]["x2"])
+        # ax[3,0].text(0, 0.8, f"X2 Jaw offset = {round(x2_offset,3)} mm")    #pixel size 0.34 mm /2
         
-        fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"{g}_{90}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
-        del fig
-        plt.close()
+        # fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"{g}_{90}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
+        # del fig
+        # plt.close()
         #plt.show()
 
 
@@ -485,32 +482,32 @@ def get_jaw_offsets(img_dict, unit_num):
         offset_dict[g][270]["y2"] = y2_offset 
 
 
-        fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17, 17))
-        ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {270}$^\circ$")
-        ax[0,0].plot(y1_profile)
-        ax[0,1].plot(y1_profile_grad)
-        ax[0,2].imshow(img_dict[g][270]["y1"])
-        ax[0,0].text(1450, 0.8, f"Y1 Jaw offset = {round(y1_offset,3)} mm")    #pixel size 0.34 mm /2
+        # fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17, 17))
+        # ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {270}$^\circ$")
+        # ax[0,0].plot(y1_profile)
+        # ax[0,1].plot(y1_profile_grad)
+        # ax[0,2].imshow(img_dict[g][270]["y1"])
+        # ax[0,0].text(1450, 0.8, f"Y1 Jaw offset = {round(y1_offset,3)} mm")    #pixel size 0.34 mm /2
     
-        ax[1,0].plot(y2_profile)
-        ax[1,1].plot(y2_profile_grad)
-        ax[1,2].imshow(img_dict[g][270]["y2"])
-        ax[1,0].text(0, 0.8, f"Y2 Jaw offset = {round(y2_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[1,0].plot(y2_profile)
+        # ax[1,1].plot(y2_profile_grad)
+        # ax[1,2].imshow(img_dict[g][270]["y2"])
+        # ax[1,0].text(0, 0.8, f"Y2 Jaw offset = {round(y2_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        ax[2,0].plot(x1_profile)
-        ax[2,1].plot(x1_profile_grad)
-        ax[2,2].imshow(img_dict[g][270]["x1"])
-        ax[2,0].text(0, 0.8, f"X1 Jaw offset = {round(x1_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[2,0].plot(x1_profile)
+        # ax[2,1].plot(x1_profile_grad)
+        # ax[2,2].imshow(img_dict[g][270]["x1"])
+        # ax[2,0].text(0, 0.8, f"X1 Jaw offset = {round(x1_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        ax[3,0].plot(x2_profile)
-        ax[3,1].plot(x2_profile_grad)
-        ax[3,2].imshow(img_dict[g][270]["x2"])
-        ax[3,0].text(1450, 0.8, f"X2 Jaw offset = {round(x2_offset,3)} mm")    #pixel size 0.34 mm /2
+        # ax[3,0].plot(x2_profile)
+        # ax[3,1].plot(x2_profile_grad)
+        # ax[3,2].imshow(img_dict[g][270]["x2"])
+        # ax[3,0].text(1450, 0.8, f"X2 Jaw offset = {round(x2_offset,3)} mm")    #pixel size 0.34 mm /2
 
-        fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"{g}_{0}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
-        #plt.show()
-        del fig
-        plt.close()
+        # fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"{g}_{0}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
+        # #plt.show()
+        # del fig
+        # plt.close()
 
     #now want bar plots of offsets vs/ gantry / collimator for each angle
     #for clustered bar, need to sort data first into a new dictionary for plotting
@@ -545,9 +542,9 @@ def get_jaw_offsets(img_dict, unit_num):
         ax.set_position([box.x0, box.y0+box.height * 0.1, box.width, box.height * 0.9])
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=3)
         fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"bar_plot_offsets_{jaw}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
-        plt.show(block=True)
-        plt.close()
-        plt.cla()
+        # plt.show(block=True)
+        # plt.close()
+        # plt.cla()
         del fig
             
 
@@ -642,9 +639,9 @@ def calculate_cost(offsets : dict, junction_priority=0.5):
         junction_gap_0 = lower_x2 + g0c90_x1  #adding together will give the total error from perfect junction (whether it's a gap or an overlap)
         junction_gap_180 = lower_x2 + g180c90_x1
         if junction_gap_0 < 0:
-            cost_cold_junction += abs(junction_gap_0)
+            cost_cold_junction += 0.5*abs(junction_gap_0)
         if junction_gap_180 < 0:
-            cost_cold_junction += abs(junction_gap_180)
+            cost_cold_junction += 0.5*abs(junction_gap_180)
 
 
     #now total cost is a combination of the three values (based on the junction priority)
@@ -740,7 +737,8 @@ def get_opt_origin(offsets : dict, junction_priority, unit_num):
     ax[1].set_ylabel("X2 Displacement from Iso (mm)")
 
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"optimal_x1_x2_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
-    plt.show()
+    #plt.show()
+    del fig
 
  
 
@@ -774,7 +772,8 @@ def get_opt_origin(offsets : dict, junction_priority, unit_num):
     ax[1].set_xlabel("Y1 Displacement from Iso (mm)")
     ax[1].set_ylabel("Y2 Displacement from Iso (mm)")
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"optimal_y1_y2_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
-    plt.show()
+    #plt.show()
+    del fig
 
 
 
@@ -834,14 +833,14 @@ def get_opt_origin(offsets : dict, junction_priority, unit_num):
         
     return tuple((opt_offset_x1, opt_offset_x2, opt_offset_y1, opt_offset_y2)), new_offsets
 
-def predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_folder):
+def predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_folder, enc_iso_img_path):
 
 
     #first collect imgs:
     img_dict = sort_image_dict(img_folder)
-    iso_img_path = os.path.join(os.getcwd(), "U1_encoder_iso_oct16.dcm")
+    
 
-    #fit_encoder_vs_pixel_funcs(enc_img_folder, iso_img_path, unit_num=unit_num, optimal_cal=[0.1, 0.1, -0.5, -0.3])
+    #fit_encoder_vs_pixel_funcs(enc_img_folder, enc_iso_img_path, unit_num=unit_num, optimal_cal=[0.1, 0.1, -0.5, -0.3])
     # #now want to define the offset of each 1/4 blocked beam's jaw from isocentre at each gantry/collimator combination
     offsets = get_jaw_offsets(img_dict, unit_num)
 
@@ -852,7 +851,7 @@ def predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_fo
 
     #now get jaw images to use for encoder-jaw correlations
 
-    fit_encoder_vs_pixel_funcs(enc_img_folder, iso_img_path, unit_num=unit_num, optimal_cal=optimal_cal)
+    fit_encoder_vs_pixel_funcs(enc_img_folder, enc_iso_img_path, unit_num=unit_num, optimal_cal=optimal_cal)
 
 def calculate_offsets(unit_num, img_folder):
 
@@ -863,16 +862,16 @@ def calculate_offsets(unit_num, img_folder):
     offsets = get_jaw_offsets(img_dict, unit_num)
 
 
-unit_num=1
-junction_priority=0.99
+unit_num=4
+junction_priority=0.75
 
 
 #encoder_dic = define_encoder_dict(unit_num)
-img_folder = os.path.join(os.getcwd(), f"U{unit_num}_pre_oct17")
-enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_encoder_images")
+img_folder = os.path.join(os.getcwd(), f"U{unit_num}_pre_sep29")
+enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_Encoders_Oct7")
+enc_iso_img_path = os.path.join(os.getcwd(), f"U{unit_num}_encoder_iso_oct07.dcm")
 
-
-predict_optimal_encoders(unit_num=unit_num, junction_priority=junction_priority, img_folder=img_folder, enc_img_folder=enc_img_folder)
+predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_folder, enc_iso_img_path)
 
 #calculate_offsets(unit_num=unit_num, img_folder=img_folder)
 
