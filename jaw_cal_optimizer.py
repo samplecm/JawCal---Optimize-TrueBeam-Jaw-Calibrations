@@ -455,6 +455,8 @@ def get_jaw_offsets(img_dict, unit_num):
         #determine centre as pixel with sharpest gradient
         x2_profile_grad = np.gradient(x2_profile)
         x2_offset = (np.argmin(abs(x2_profile - 0.5)) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        # plt.plot(x2_profile)
+        # plt.show()
         offset_dict[g][270]["x2"] = x2_offset 
 
         #repeat for x1 jaw
@@ -643,7 +645,7 @@ def calculate_cost(offsets : dict, junction_priority=0.5):
         if junction_gap_180 < 0:
             cost_cold_junction += 0.5*abs(junction_gap_180)
 
-
+    
     #now total cost is a combination of the three values (based on the junction priority)
     cost = junction_priority*(cost_junction+cost_cold_junction) + (1-junction_priority)*cost_absolute
 
@@ -862,14 +864,14 @@ def calculate_offsets(unit_num, img_folder):
     offsets = get_jaw_offsets(img_dict, unit_num)
 
 
-unit_num=4
-junction_priority=0.75
+unit_num=2
+junction_priority=0.5
 
 
 #encoder_dic = define_encoder_dict(unit_num)
-img_folder = os.path.join(os.getcwd(), f"U{unit_num}_pre_sep29")
-enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_Encoders_Oct7")
-enc_iso_img_path = os.path.join(os.getcwd(), f"U{unit_num}_encoder_iso_oct07.dcm")
+img_folder = os.path.join(os.getcwd(), f"U{unit_num}_pOST_oct29")
+enc_img_folder = os.path.join(os.getcwd(), f"U{unit_num}_encoders_oct29")
+enc_iso_img_path = os.path.join(os.getcwd(), f"U{unit_num}_iso_encoder.dcm")
 
 predict_optimal_encoders(unit_num, junction_priority, img_folder, enc_img_folder, enc_iso_img_path)
 
