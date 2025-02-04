@@ -10,10 +10,10 @@ from scipy.ndimage import zoom, gaussian_filter
 import datetime
 from lrfc_test import lrfc
 
-def define_encoder_dict(unit=2):
+def define_encoder_dict(unit=2, date=None):
     #this function initializes the dictionary of jaw positions --> encoder values. 
     #it reads an encoder csv file and stores the encoder values in a dictionary with their approximate (machine - read) symmetric jaw value
-    encoder_file = os.path.join(os.getcwd(), "encoder_spreadsheets", f"u{unit}_encoders.csv")
+    encoder_file = os.path.join(os.getcwd(), "encoder_spreadsheets", f"u{unit}_encoders_{date}.csv")
     with open(encoder_file) as fp:
         reader = csv.reader(fp)
         csv_data_list = []
@@ -39,17 +39,17 @@ def normalize_by_top_median(img, num=10000):
     med=np.median(hottest)
     return  img / med
 
-def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
+def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal_cal):
     #this function finds the epid pixels corresponding to each jaw position in img_dict, and then fits a curve to those pixel values with the jaw encoder readouts
 
-    encoder_dic = define_encoder_dict(unit_num)   #initialize dictionary which will hold jaw positions, encoders, pixels
+    encoder_dic = define_encoder_dict(unit_num, date)   #initialize dictionary which will hold jaw positions, encoders, pixels
     #get iso img
     img_meta = pydicom.dcmread(iso_img_path)
     img = img_meta.pixel_array
     img = normalize_by_top_median(img)   #normalize image
     img = gaussian_filter(img, sigma=3, order=0)    #smoothen the image
-    iso_img = zoom(img, zoom=2, order=3)
-    iso = find_bead_location(iso_img, round_final=True)    #first get the pixel position of the isocentre
+    iso_img = zoom(img, zoom=3, order=3)
+    iso = find_bead_location(iso_img, round_final=True, zoom_size=3)    #first get the pixel position of the isocentre
 
     for img_path in sorted(os.listdir(img_folder)):
         img_path = os.path.join(img_folder, img_path)
@@ -59,10 +59,10 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
         img = img_meta.pixel_array
         img = normalize_by_top_median(img)
         img = gaussian_filter(img, sigma=3, order=0)    #smoothen the image
-        img = zoom(img, zoom=2, order=3)
+        img = zoom(img, zoom=3, order=3)
 
         #x1:
-        x1_profile = deepcopy(img[iso[0], 0:1500])
+        x1_profile = deepcopy(img[iso[0], 0:2250])
         #determine centre as pixel with sharpest gradient
         x1_profile_grad = np.gradient(x1_profile)
         x1_pixel_old = np.argmax(x1_profile_grad)
@@ -74,34 +74,34 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
         encoder_dic["x1"][x1_displacement]["pixel"] = x1_pixel
 
         #x2:
-        x2_profile = deepcopy(img[iso[0], 1000:-1])
+        x2_profile = deepcopy(img[iso[0], 1500:-1])
 
         #determine centre as pixel with sharpest gradient
         x2_profile_grad = np.gradient(x2_profile)
         x2_pixel_old = np.argmin(x2_profile_grad)
         x2_profile[:x2_pixel_old-20] = 1    #only find the right jaw by zoning in on correct gradient area
         x2_profile[x2_pixel_old+20:] = 1    #only find the right jaw by zoning in on correct gradient area
-        x2_pixel = np.argmin(abs(x2_profile - 0.5))+1000
+        x2_pixel = np.argmin(abs(x2_profile - 0.5))+1500
         x2_displacement = round_to_point_five(round(2*abs(jaws_x[1])/10,1))#round((round(4*(x2_pixel - iso[1]) * pixel_distance/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
 
         encoder_dic["x2"][x2_displacement]["pixel"] = x2_pixel
 
 
         #y1:
-        y1_profile = deepcopy(img[1000:-1, iso[1]])
+        y1_profile = deepcopy(img[1500:-1, iso[1]])
 
         #determine centre as pixel with sharpest gradient
         y1_profile_grad = np.gradient(y1_profile)
         y1_pixel_old = np.argmin(y1_profile_grad)
         y1_profile[:y1_pixel_old-20] = 1    #only find the right jaw by zoning in on correct gradient area
         y1_profile[y1_pixel_old+20:] = 1    #only find the right jaw by zoning in on correct gradient area
-        y1_pixel = np.argmin(abs(y1_profile - 0.5))+1000
+        y1_pixel = np.argmin(abs(y1_profile - 0.5))+1500
         y1_displacement = round_to_point_five(round(2*abs(jaws_y[0])/10,1))#round((round(4*(y1_pixel - iso[0]) * pixel_distance/2)/2),1)   #--> cm bc make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
 
         encoder_dic["y1"][y1_displacement]["pixel"] = y1_pixel
 
         #y2:
-        y2_profile = deepcopy(img[0:1500, iso[1]])
+        y2_profile = deepcopy(img[0:2250, iso[1]])
         #determine centre as pixel with sharpest gradient
         y2_profile_grad = np.gradient(y2_profile)
         y2_pixel_old = np.argmax(y2_profile_grad)
@@ -143,14 +143,14 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
         ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
 
         #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
-        iso = find_bead_location(iso_img, round_final=False) #get unrounded iso
+        iso = find_bead_location(iso_img, round_final=False, zoom_size=3) #get unrounded iso
         p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit)
         if j == 0:
             ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 1:
-            ax[j].text(1300, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(2250, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 2:
-            ax[j].text(1300,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(2250,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 3:
             ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_cubic"))
@@ -185,14 +185,14 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
         ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
 
         #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
-        iso = find_bead_location(iso_img, round_final=False) #get unrounded iso
+        iso = find_bead_location(iso_img, round_final=False, zoom_size=3) #get unrounded iso
         p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit)
         if j == 0:
             ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 1:
-            ax[j].text(1300, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(2250, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 2:
-            ax[j].text(1300,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].text(2250,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 3:
             ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_linear"))
@@ -201,7 +201,7 @@ def fit_encoder_vs_pixel_funcs(img_folder, iso_img_path, unit_num, optimal_cal):
     return
 
 def predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=1.18):
-    pixel_distance = 0.336 / epid_position / 2
+    pixel_distance = 0.336 / epid_position / 3
     #this function returns the encoder values of the jaw calibration positions (1,5,9,19) calculated relative to optimal origin
 
     #first get the jaw positions in pixels, relative to origin.
@@ -250,8 +250,6 @@ def sort_junc_img_dict(img_folder : str):
     for img_path in os.listdir(img_folder):
         img_path = os.path.join(img_folder, img_path)
         img_meta = pydicom.dcmread(img_path)
-        jaws_x = img_meta[0x3002,0x0030][0][0x300A,0x00B6][0][0x300A,0X011C].value
-        jaws_y = img_meta[0x3002,0x0030][0][0x300A,0x00B6][1][0x300A,0X011C].value
         img = img_meta.pixel_array
         img = normalize_by_top_median(img)
         img = gaussian_filter(img, sigma=3, order=0)    #smoothen the image
@@ -406,46 +404,32 @@ def get_junc_offsets(img_dict, unit_num):
         isocentre = offset_dict[g]["iso"]
 
         #y1 - want profile through centre y along x
-        y1_profile = deepcopy(img_dict[g][0]["y1"][:, round(isocentre[1])])
-        y1_profile[0:int(y1_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        y1_profile[int(3*y1_profile.size/4):] = 1
-        # plt.plot(y1_profile)
-        # plt.show()
-        #determine centre as pixel with sharpest gradient
-
-        y1_offset = (np.argmin(abs(y1_profile - 0.5)) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw openy)     
+        y1_profile = deepcopy(img_dict[g][0]["y1"][:, round(isocentre[1])-20:round(isocentre[1])+20])
+        y1_profile[0:int(y1_profile.shape[0]/4),:] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        y1_profile[int(3*y1_profile.shape[0]/4):,:] = 1
+        y1_offset = (np.mean(np.argmin(abs(y1_profile - 0.5), axis=0)) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw openy)     
         offset_dict[g][0]["y1"] = y1_offset 
 
         #repeat for y2 jaw
-        y2_profile = deepcopy(img_dict[g][0]["y2"][:, round(isocentre[1])])
-        y2_profile[0:int(y2_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        y2_profile[int(3*y2_profile.size/4):] = 1
-        # plt.plot(y2_profile)
-        # plt.show()
-
-        y2_offset = -(np.argmin(abs(y2_profile - 0.5)) - isocentre[0])* 0.224/2
+        y2_profile = deepcopy(img_dict[g][0]["y2"][:, round(isocentre[1])-20:round(isocentre[1])+20])
+        y2_profile[0:int(y2_profile.shape[0]/4),:] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        y2_profile[int(3*y2_profile.shape[0]/4):,:] = 1
+        y2_offset = -(np.mean(np.argmin(abs(y2_profile - 0.5), axis=0)) - isocentre[0])* 0.224/2
         offset_dict[g][0]["y2"] = y2_offset 
 
         #repeat for x1 jaw
-        x1_profile = deepcopy(img_dict[g][0]["x1"][round(isocentre[0]), :])
-        x1_profile[0:int(x1_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        x1_profile[int(3*x1_profile.size/4):] = 1
-        # plt.plot(x1_profile)
-        # plt.show()
-
-        x1_offset = -(np.argmin(abs(x1_profile - 0.5)) - isocentre[1])* 0.224/2
+        x1_profile = deepcopy(img_dict[g][0]["x1"][round(isocentre[0])-20:round(isocentre[0])+20, :])
+        x1_profile[:,0:int(x1_profile.shape[1]/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        x1_profile[:,int(3*x1_profile.shape[1]/4):] = 1
+        x1_offset = -(np.mean(np.argmin(abs(x1_profile - 0.5), axis=1)) - isocentre[1])* 0.224/2
         offset_dict[g][0]["x1"] = x1_offset  
 
         #repeat for x2 jaw
-        x2_profile = deepcopy(img_dict[g][0]["x2"][round(isocentre[0]), :])
-        x2_profile[0:int(x2_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        x2_profile[int(3*x2_profile.size/4):] = 1
-        # plt.plot(x2_profile)
-        # plt.show()
-
-        x2_offset = (np.argmin(abs(x2_profile - 0.5)) - isocentre[1])* 0.224/2
+        x2_profile = deepcopy(img_dict[g][0]["x2"][round(isocentre[0])-20:round(isocentre[0])+20, :])
+        x2_profile[:,0:int(x2_profile.shape[1]/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        x2_profile[:,int(3*x2_profile.shape[1]/4):] = 1
+        x2_offset = (np.mean(np.argmin(abs(x2_profile - 0.5), axis=1)) - isocentre[1])* 0.224/2
         offset_dict[g][0]["x2"] = x2_offset 
-
 
         # fig, ax = plt.subplots(nrows=4, ncols=3, figsize=(17, 17))
         # ax[0,0].set_title(f"Gantry Angle: {g}$^\circ$, Collimator Angle: {0}$^\circ$")
@@ -475,39 +459,32 @@ def get_junc_offsets(img_dict, unit_num):
 
         #plt.close()
 
-  
-
         #y1 - want profile through centre y along x
-        x1_profile = deepcopy(img_dict[g][90]["x1"][:, round(isocentre[1])])
-        x1_profile[0:int(x1_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        x1_profile[int(3*x1_profile.size/4):] = 1
-        #determine centre as pixel with sharpest gradient
-        x1_profile_grad = np.gradient(x1_profile)
-        x1_offset = (np.argmin(abs(x1_profile - 0.5)) - isocentre[0])* 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)
+        x1_profile = deepcopy(img_dict[g][90]["x1"][:, round(isocentre[1])-20:round(isocentre[1])+20])
+        x1_profile[0:int(x1_profile.shape[0]/4),:] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        x1_profile[int(3*x1_profile.shape[0]/4):,:] = 1
+        x1_offset = (np.mean(np.argmin(abs(x1_profile - 0.5), axis=0)) - isocentre[0])* 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)
         offset_dict[g][90]["x1"] = x1_offset
 
         #repeat for y2 jaw
-        x2_profile = deepcopy(img_dict[g][90]["x2"][:, round(isocentre[1])])
-        x2_profile[0:int(x2_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        x2_profile[int(3*x2_profile.size/4):] = 1
-        x2_profile_grad = np.gradient(x2_profile)
-        x2_offset = -(np.argmin(abs(x2_profile - 0.5)) - isocentre[0])* 0.224/2
+        x2_profile = deepcopy(img_dict[g][90]["x2"][:, round(isocentre[1])-20:round(isocentre[1])+20])
+        x2_profile[0:int(x2_profile.shape[0]/4),:] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        x2_profile[int(3*x2_profile.shape[0]/4):,:] = 1
+        x2_offset = -(np.mean(np.argmin(abs(x2_profile - 0.5), axis=0)) - isocentre[0])* 0.224/2
         offset_dict[g][90]["x2"] = x2_offset 
 
         #repeat for x1 jaw
-        y2_profile = deepcopy(img_dict[g][90]["y2"][round(isocentre[0]), :])
-        y2_profile[0:int(y2_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        y2_profile[int(3*y2_profile.size/4):] = 1
-        y2_profile_grad = np.gradient(y2_profile)
-        y2_offset = -(np.argmin(abs(y2_profile - 0.5)) - isocentre[1])* 0.224/2
+        y2_profile = deepcopy(img_dict[g][90]["y2"][round(isocentre[0])-20:round(isocentre[0])+20, :])
+        y2_profile[:, 0:int(y2_profile.shape[1]/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        y2_profile[:, int(3*y2_profile.shape[1]/4):] = 1
+        y2_offset = -(np.mean(np.argmin(abs(y2_profile - 0.5), axis=1)) - isocentre[1])* 0.224/2
         offset_dict[g][90]["y2"] = y2_offset
 
         #repeat for x2 jaw
-        y1_profile = deepcopy(img_dict[g][90]["y1"][round(isocentre[0]), :])
-        y1_profile[0:int(y1_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        y1_profile[int(3*y1_profile.size/4):] = 1
-        y1_profile_grad = np.gradient(y1_profile)
-        y1_offset = (np.argmin(abs(y1_profile - 0.5)) - isocentre[1])* 0.224/2
+        y1_profile = deepcopy(img_dict[g][90]["y1"][round(isocentre[0])-20:round(isocentre[0])+20, :])
+        y1_profile[:, 0:int(y1_profile.shape[1]/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        y1_profile[:, int(3*y1_profile.shape[1]/4):] = 1
+        y1_offset = (np.mean(np.argmin(abs(y1_profile - 0.5), axis=1)) - isocentre[1])* 0.224/2
         offset_dict[g][90]["y1"] = y1_offset 
 
 
@@ -542,38 +519,34 @@ def get_junc_offsets(img_dict, unit_num):
 
         #Now repeat for the c = 270 images from left counter clockwise - (y1, x2, y2, x1)
         #x2 - want profile through centre y along x
-        x2_profile = deepcopy(img_dict[g][270]["x2"][:, round(isocentre[1])])
-        x2_profile[0:int(x2_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        x2_profile[int(3*x2_profile.size/4):] = 1
+        x2_profile = deepcopy(img_dict[g][270]["x2"][:, round(isocentre[1])-20:round(isocentre[1])+20])
+        x2_profile[0:int(x2_profile.shape[0]/4):] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        x2_profile[int(3*x2_profile.shape[0]/4):,:] = 1
         #determine centre as pixel with sharpest gradient
-        x2_profile_grad = np.gradient(x2_profile)
-        x2_offset = (np.argmin(abs(x2_profile - 0.5)) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
+        x2_offset = (np.mean(np.argmin(abs(x2_profile - 0.5), axis=0)) - isocentre[0]) * 0.224/2   #make negative to follow sign convention (positive if jaw crosses iso, negative if shy)     
         # plt.plot(x2_profile)
         # plt.show()
         offset_dict[g][270]["x2"] = x2_offset 
 
         #repeat for x1 jaw
-        x1_profile = deepcopy(img_dict[g][270]["x1"][:, round(isocentre[1])])
-        x1_profile[0:int(x1_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        x1_profile[int(3*x1_profile.size/4):] = 1
-        x1_profile_grad = np.gradient(x1_profile)
-        x1_offset = -(np.argmin(abs(x1_profile - 0.5)) - isocentre[0])* 0.224/2
+        x1_profile = deepcopy(img_dict[g][270]["x1"][:, round(isocentre[1])-20:round(isocentre[1])+20])
+        x1_profile[0:int(x1_profile.shape[0]/4),:] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        x1_profile[int(3*x1_profile.shape[0]/4):,:] = 1
+        x1_offset = -(np.mean(np.argmin(abs(x1_profile - 0.5), axis=0)) - isocentre[0])* 0.224/2
         offset_dict[g][270]["x1"] = x1_offset 
 
         #repeat for y1 jaw
-        y1_profile = deepcopy(img_dict[g][270]["y1"][round(isocentre[0]), :])
-        y1_profile[0:int(y1_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        y1_profile[int(3*y1_profile.size/4):] = 1
-        y1_profile_grad = np.gradient(y1_profile)
-        y1_offset = -(np.argmin(abs(y1_profile - 0.5)) - isocentre[1])* 0.224/2
+        y1_profile = deepcopy(img_dict[g][270]["y1"][round(isocentre[0])-20:round(isocentre[0])+20, :])
+        y1_profile[:,0:int(y1_profile.shape[1]/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        y1_profile[:,int(3*y1_profile.shape[1]/4):] = 1
+        y1_offset = -(np.mean(np.argmin(abs(y1_profile - 0.5), axis=1)) - isocentre[1])* 0.224/2
         offset_dict[g][270]["y1"] = y1_offset  
-
+ 
         #repeat for y2 jaw
-        y2_profile = deepcopy(img_dict[g][270]["y2"][round(isocentre[0]), :])
-        y2_profile[0:int(y2_profile.size/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
-        y2_profile[int(3*y2_profile.size/4):] = 1
-        y2_profile_grad = np.gradient(y2_profile)
-        y2_offset = (np.argmin(abs(y2_profile - 0.5)) - isocentre[1])* 0.224/2
+        y2_profile = deepcopy(img_dict[g][270]["y2"][round(isocentre[0])-20:round(isocentre[0])+20, :])
+        y2_profile[:,0:int(y2_profile.shape[1]/4)] = 1    #make borders zero so that center closed jaw is properly found, and not the other jaw edge. 
+        y2_profile[:,int(3*y2_profile.shape[1]/4):] = 1
+        y2_offset = (np.mean(np.argmin(abs(y2_profile - 0.5), axis=1)) - isocentre[1])* 0.224/2
         offset_dict[g][270]["y2"] = y2_offset 
 
 
@@ -607,40 +580,40 @@ def get_junc_offsets(img_dict, unit_num):
     #now want bar plots of offsets vs/ gantry / collimator for each angle
     #for clustered bar, need to sort data first into a new dictionary for plotting
 
-    for jaw in ["x1", "x2", "y1", "y2"]:
-        gantry_angles = sorted(offset_dict.keys())
-        plot_dic = {}
-        for c in [90, 0, 270]:
-            vals = []
-            for g in sorted(offset_dict.keys()):
-                vals.append(offset_dict[g][c][jaw])
-            plot_dic[c] = tuple(vals)
+    # for jaw in ["x1", "x2", "y1", "y2"]:
+    #     gantry_angles = sorted(offset_dict.keys())
+    #     plot_dic = {}
+    #     for c in [90, 0, 270]:
+    #         vals = []
+    #         for g in sorted(offset_dict.keys()):
+    #             vals.append(offset_dict[g][c][jaw])
+    #         plot_dic[c] = tuple(vals)
         
-        g_range = np.arange(len(offset_dict.keys()))
-        width = 0.25
-        multiplier = 0
+        # g_range = np.arange(len(offset_dict.keys()))
+        # width = 0.25
+        # multiplier = 0
 
-        fig, ax = plt.subplots(layout='constrained')
-        colors= ["salmon", "moccasin", "skyblue"]    #colours for diff coll angles
-        for c, val in plot_dic.items():
-            offset = width * multiplier
-            rects = ax.bar(g_range + offset, val, width, label=f"Collimator {c}$^\circ$", color=colors[multiplier], edgecolor="black")
-            ax.bar_label(rects, padding=3, rotation=90)
-            multiplier += 1
-        ax.set_ylabel("Offset from isocentre (mm)")
-        ax.set_title(f"{jaw.upper()} Jaw Offset From Isocentre")
-        ax.set_xticks(g_range + width, gantry_angles)
-        ylims = ax.get_ylim()
-        ax.set_ylim([ylims[0]-abs(ylims[0])*0.15, ylims[1]+abs(ylims[1])*0.15])
-        #reset axes to fit legend nicely
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0+box.height * 0.1, box.width, box.height * 0.9])
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=3)
-        fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"bar_plot_offsets_{jaw}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
-        # plt.show(block=True)
-        # plt.close()
-        # plt.cla()
-        del fig
+        # fig, ax = plt.subplots(layout='constrained')
+        # colors= ["salmon", "moccasin", "skyblue"]    #colours for diff coll angles
+        # for c, val in plot_dic.items():
+        #     offset = width * multiplier
+        #     rects = ax.bar(g_range + offset, val, width, label=f"Collimator {c}$^\circ$", color=colors[multiplier], edgecolor="black")
+        #     ax.bar_label(rects, padding=3, rotation=90)
+        #     multiplier += 1
+        # ax.set_ylabel("Offset from isocentre (mm)")
+        # ax.set_title(f"{jaw.upper()} Jaw Offset From Isocentre")
+        # ax.set_xticks(g_range + width, gantry_angles)
+        # ylims = ax.get_ylim()
+        # ax.set_ylim([ylims[0]-abs(ylims[0])*0.15, ylims[1]+abs(ylims[1])*0.15])
+        # #reset axes to fit legend nicely
+        # box = ax.get_position()
+        # ax.set_position([box.x0, box.y0+box.height * 0.1, box.width, box.height * 0.9])
+        # ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=3)
+        # fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"bar_plot_offsets_{jaw}_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
+        # # plt.show(block=True)
+        # # plt.close()
+        # # plt.cla()
+        # del fig
             
 
 
@@ -693,7 +666,7 @@ def get_jaw_offsets(img_dict,isocentre):
 
     return offset_dict
 
-def find_bead_location(image: np.array, round_final=True):
+def find_bead_location(image: np.array, round_final=True, zoom_size=2):
     #here we simply determine the pixel location of the centre of the bead in the cubic phantom
     #img = (deepcopy(image) - np.amin(image)) / (np.amax(image) - np.amin(image))
     img = deepcopy(image) / np.amax(image)
@@ -709,7 +682,7 @@ def find_bead_location(image: np.array, round_final=True):
 
     #now keep the lowest 100 pixels (will be the bead location, and find centre of mass)
     pixel_list = sorted(img.flatten().tolist())
-    pixel_100 = pixel_list[200]
+    pixel_100 = pixel_list[200*int(zoom_size/2)**2]
     img[img > pixel_100] = 0
 
     # plt.imshow(img)
@@ -804,27 +777,47 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
         #now calculate new lrfc val for all lrfc images checked
 
         lrfc_cost = 0
+        #first calculate cost based on rad/light displacement
         for lrfc_val in lrfc_vals:
-            new_rad_light_y = lrfc_val[0] + (disp_y1/2 + -disp_y2/2) 
-            new_rad_light_x = lrfc_val[1] + (-disp_x1/2 + disp_x2/2)
+            rad_disp = lrfc_val[0]
 
-            if new_rad_light_y < 0.4: 
+            lrfc_jaw_disps = lrfc_val[1] #in order [y1_disp, y2_disp, x1_disp, x2_disp]
+            new_rad_disp_y = rad_disp[0] + (disp_y1/2 + -disp_y2/2) 
+            new_rad_disp_x = rad_disp[1] + (-disp_x1/2 + disp_x2/2)
+
+            if new_rad_disp_y < 0.4: 
                 if optimize_lrfc:
                     lrfc_cost += 0#abs(new_rad_light_y)
-            elif new_rad_light_y < 0.9:
-                lrfc_cost += abs(new_rad_light_y**2)
+            elif new_rad_disp_y < 0.9:
+                lrfc_cost += abs(new_rad_disp_y**2)
             else:
-                lrfc_cost = abs(new_rad_light_y**3) #huge cost, do not want an lrfc value out of action
+                lrfc_cost = abs(new_rad_disp_y**3) #huge cost, do not want an lrfc value out of action
 
-            if new_rad_light_x < 0.4: 
+            if new_rad_disp_x < 0.4: 
                 if optimize_lrfc:
                     lrfc_cost += 0#abs(new_rad_light_x)
-            elif new_rad_light_x < 0.9:
-                lrfc_cost += abs(new_rad_light_x*2)
+            elif new_rad_disp_x < 0.9:
+                lrfc_cost += abs(new_rad_disp_x*2)
             else:
-                lrfc_cost = abs(new_rad_light_x*3) #huge cost, do not want an lrfc value out of action
+                lrfc_cost = abs(new_rad_disp_x*5) #huge cost, do not want an lrfc value out of action
+        
+            #now calculate cost from lrfc jaw displacements
+            new_y1_disp = lrfc_jaw_disps[0] + disp_y1
+            new_y2_disp = lrfc_jaw_disps[1] + disp_y2
+            new_x1_disp = lrfc_jaw_disps[2] + disp_x1
+            new_x2_disp = lrfc_jaw_disps[3] + disp_x2
 
-        lrfc_cost /= len(lrfc_vals)
+            new_lrfc_jaw_disps = [new_y1_disp, new_y2_disp, new_x1_disp, new_x2_disp]
+
+            for lrfc_jaw_disp in new_lrfc_jaw_disps:
+                if abs(lrfc_jaw_disp) < 0.5:
+                    lrfc_cost += lrfc_jaw_disp/4
+                elif abs(lrfc_jaw_disp) < 0.75:
+                    lrfc_cost += 2*lrfc_jaw_disp/4
+                else:
+                    lrfc_cost += 100 #don't want to consider cases with large jaw displacement errors.
+
+        lrfc_cost /= 2*len(lrfc_vals)
 
         cost += lrfc_cost
 
@@ -860,8 +853,8 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
         lrfc_field_sizes = []
         for file in os.listdir(lrfc_folder):
             lrfc_file = os.path.join(lrfc_folder, file)
-            lrfc_points, _, _ = lrfc(lrfc_file)
-            lrfc_vals.append(lrfc_points["rad_disp"])
+            lrfc_points= lrfc(lrfc_file)
+            lrfc_vals.append([lrfc_points["rad_disp"], lrfc_points["jaw_disps"]])
             lrfc_field_sizes.append(lrfc_points["field_size"])
     else:
         use_lrfc = False
@@ -990,9 +983,15 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
     if use_lrfc:
         new_lrfcs = []
         for lrfc_val in lrfc_vals:
-            new_rad_light_y = lrfc_val[0] + (disp_y1/2 + -disp_y2/2) 
-            new_rad_light_x = lrfc_val[1] + (-disp_x1/2 + disp_x2/2)
-            new_lrfcs.append([new_rad_light_y, new_rad_light_x])
+            new_rad_light_y = lrfc_val[0][0] + (disp_y1/2 + -disp_y2/2) 
+            new_rad_light_x = lrfc_val[0][1] + (-disp_x1/2 + disp_x2/2)
+
+            new_y1_disp = lrfc_val[1][0] + disp_y1
+            new_y2_disp = lrfc_val[1][1] + disp_y2
+            new_x1_disp = lrfc_val[1][2] + disp_x1
+            new_x2_disp = lrfc_val[1][3] + disp_x2
+            
+            new_lrfcs.append([[new_rad_light_y, new_rad_light_x],[new_y1_disp, new_y2_disp, new_x1_disp, new_x2_disp]])
     #want to write this data to a csv:
 
     with open(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"jaws_and_junctions_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}.csv"), 'w', newline='') as csv_file:
@@ -1028,9 +1027,14 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
             writer.writerow(["","",""])
             for f,field_size in enumerate(lrfc_field_sizes):
                 writer.writerow([f"Radiation Light Field Coincidence ({field_size}X{field_size})", "Original", "Final"])
+                writer.writerow(["Y", lrfc_vals[f][0][0],new_lrfcs[f][0][0]])
+                writer.writerow(["X", lrfc_vals[f][0][1],new_lrfcs[f][0][1]])
 
-                writer.writerow(["Y", lrfc_vals[f][0],new_lrfcs[f][0]])
-                writer.writerow(["X", lrfc_vals[f][1],new_lrfcs[f][1]])
+                writer.writerow([f"Radiation Jaw Displacements ({field_size}X{field_size})", "Original", "Final"])
+                writer.writerow(["Y1", lrfc_vals[f][1][0],new_lrfcs[f][1][0]])
+                writer.writerow(["Y2", lrfc_vals[f][1][1],new_lrfcs[f][1][1]])
+                writer.writerow(["X1", lrfc_vals[f][1][2],new_lrfcs[f][1][2]])
+                writer.writerow(["X2", lrfc_vals[f][1][3],new_lrfcs[f][1][3]])
 
         writer.writerow(["","",""])
         writer.writerow(["Jaw Displacements from Isocentre"])
@@ -1071,7 +1075,7 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
 
     return tuple((opt_offset_x1, opt_offset_x2, opt_offset_y1, opt_offset_y2)), new_offsets
 
-def predict_optimal_encoders(unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=True):
+def predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=True):
 
     if not os.path.exists(os.path.join(os.getcwd(), f"U{unit_num}_Output")):
         os.mkdir(os.path.join(os.getcwd(), f"U{unit_num}_Output"))
@@ -1099,7 +1103,7 @@ def predict_optimal_encoders(unit_num, junction_priority, img_folder, jaw_pos_fo
 
     #now get jaw images to use for encoder-jaw correlations
 
-    fit_encoder_vs_pixel_funcs(enc_img_folder, enc_iso_img_path, unit_num=unit_num, optimal_cal=optimal_cal)
+    fit_encoder_vs_pixel_funcs(date, enc_img_folder, enc_iso_img_path, unit_num=unit_num, optimal_cal=optimal_cal)
 
 
 
@@ -1107,10 +1111,9 @@ def predict_optimal_encoders(unit_num, junction_priority, img_folder, jaw_pos_fo
 unit_num=4
 junction_priority=0.7
 optimize_junctions = True
-date="dec12"
-pre_or_post = "pre"
+date="jan13"
+pre_or_post = "post"
 
-encoder_dic = define_encoder_dict(unit_num)
 img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_{pre_or_post}_{date}")
 lrfc_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_lrfc_{pre_or_post}_{date}")
 
@@ -1119,10 +1122,7 @@ enc_iso_img_path = os.path.join(os.getcwd(), "Images", f"U{unit_num}_iso_encoder
 
 jaw_pos_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_jaws_{pre_or_post}_{date}")
 
-predict_optimal_encoders(unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=optimize_junctions)
+predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=optimize_junctions)
 
 
-
-
-    
 print("Program Finished Successfully")

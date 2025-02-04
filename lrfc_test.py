@@ -6,7 +6,16 @@ import os
 from scipy.ndimage import zoom, gaussian_filter
 import matplotlib.pyplot as plt
 from numpy.ma import masked_array 
+import warnings
+warnings.filterwarnings("ignore")
 
+def normalize_by_top_median(img, num=10000):
+    #this function normalizes an image by the median of the top num of pixels
+    flattened = deepcopy(img).flatten()
+    sorted_pixels = np.sort(flattened)[::-1]
+    hottest = sorted_pixels[:num]
+    med=np.median(hottest)
+    return  img / med
 
 def find_bb(image, bounds=[[0,-1],[0,-1]], zoom_factor=3):
     image = (copy.deepcopy(image) - np.amin(image)) / (np.amax(image) - np.amin(image))
@@ -21,7 +30,7 @@ def find_bb(image, bounds=[[0,-1],[0,-1]], zoom_factor=3):
     centre_pixels = np.nonzero(img)
     centre_of_mass = np.mean(centre_pixels, axis=1)
 
-    centre_of_mass = np.unravel_index(min_pixel, img.shape)
+    #centre_of_mass = np.unravel_index(min_pixel, img.shape)
 
  
     return [centre_of_mass[0] + bounds[0][0], centre_of_mass[1] + bounds[1][0]]
@@ -35,7 +44,7 @@ def lrfc(image_path, zoom_factor=3):
     jaws_y = meta[0x3002,0x0030][0][0x300A,0x00B6][1][0x300A,0X011C].value
     image = meta.pixel_array
     #this function performs lrfc test on the given image, assuming both plates are present (the light field alignment plate and the crosshair plate)
-    image = image / np.amax(image)
+    image = normalize_by_top_median(image)
     image = zoom(image, zoom=zoom_factor, order=3)
     points = {}    #hold the bb location points 
 
@@ -73,11 +82,11 @@ def lrfc(image_path, zoom_factor=3):
     #now need position of outside bbs in phantom
 
     #search in a box inside from the corners of jaws:
-    box_length = int(5/pixel_distance_conversion )    #size of box used to look for bb from jaw corner
+    box_length = int(6/pixel_distance_conversion )    #size of box used to look for bb from jaw corner
 
     #top left corner:
     corner_jaw = [points["y2"], points["x1"]]
-    bounds = [[(corner_jaw[0]+int(1.5*box_length)), (corner_jaw[0]+int(2.5*box_length))],[(corner_jaw[1]+int(box_length*1.5)),(corner_jaw[1]+int(2.5*box_length))]]   #now take box of pixels around this region.
+    bounds = [[(corner_jaw[0]+int(1.15*box_length)), (corner_jaw[0]+int(2.15*box_length))],[(corner_jaw[1]+int(box_length*1.15)),(corner_jaw[1]+int(2.15*box_length))]]   #now take box of pixels around this region.
     top_left_bb = find_bb(image, bounds=bounds)
 
     # plt.imshow(image)
@@ -85,17 +94,17 @@ def lrfc(image_path, zoom_factor=3):
 
     #top right corner:
     corner_jaw = [points["y2"], points["x2"]]
-    bounds = [[(corner_jaw[0]+int(box_length*1.5)),(corner_jaw[0]+int(2.5*box_length))], [(corner_jaw[1]-int(2.5*box_length)), (corner_jaw[1]-int(box_length*1.5))]]   #now take box of pixels around this region.
+    bounds = [[(corner_jaw[0]+int(box_length*1.15)),(corner_jaw[0]+int(2.15*box_length))], [(corner_jaw[1]-int(2.15*box_length)), (corner_jaw[1]-int(box_length*1.115))]]   #now take box of pixels around this region.
     top_right_bb = find_bb(image, bounds=bounds)
 
     #Bottom Left corner:
     corner_jaw = [points["y1"], points["x1"]]
-    bounds = [[(corner_jaw[0]-int(2.5*box_length)), (corner_jaw[0]-int(box_length*1.5))],[(corner_jaw[1]+int(box_length*1.5)),(corner_jaw[1]+int(2.5*box_length))]]   #now take box of pixels around this region.
+    bounds = [[(corner_jaw[0]-int(2.15*box_length)), (corner_jaw[0]-int(box_length*1.15))],[(corner_jaw[1]+int(box_length*1.15)),(corner_jaw[1]+int(2.15*box_length))]]   #now take box of pixels around this region.
     bottom_left_bb = find_bb(image, bounds=bounds)
 
     #Bottom Right corner:
     corner_jaw = [points["y1"], points["x2"]]
-    bounds = [[(corner_jaw[0]-int(2.5*box_length)), (corner_jaw[0]-int(box_length*1.5))],[(corner_jaw[1]-int(2.5*box_length)), (corner_jaw[1]-int(box_length*1.5))]]   #now take box of pixels around this region.
+    bounds = [[(corner_jaw[0]-int(2.15*box_length)), (corner_jaw[0]-int(box_length*1.15))],[(corner_jaw[1]-int(2.15*box_length)), (corner_jaw[1]-int(box_length*1.15))]]   #now take box of pixels around this region.
     bottom_right_bb = find_bb(image, bounds=bounds)
 
     points["bb_tl"] = top_left_bb
@@ -115,9 +124,9 @@ def lrfc(image_path, zoom_factor=3):
     
     # Find the location of jaw edges using the averaged profiles.
     y1_pixel = int(0.5*(np.argmin(abs(y1_left_profile - 0.5)) + np.argmin(abs(y1_right_profile - 0.5)))+ image.shape[0]/2)
-    y2_pixel = int(0.5*(np.argmin(abs(y2_left_profile - 0.5))+ np.argmin(abs(y2_right_profile - 0.5)))) 
-    x1_pixel = int(0.5*(np.argmin(abs(x1_top_profile - 0.5))+np.argmin(abs(x1_bottom_profile - 0.5))))
-    x2_pixel = int(0.5*(np.argmin(abs(x2_top_profile - 0.5))+np.argmin(abs(x2_bottom_profile - 0.5))) + image.shape[1]/2)
+    y2_pixel = int(0.5*(np.argmin(abs(y2_left_profile - 0.5)) + np.argmin(abs(y2_right_profile - 0.5)))) 
+    x1_pixel = int(0.5*(np.argmin(abs(x1_top_profile - 0.5))  +np.argmin(abs(x1_bottom_profile - 0.5))))
+    x2_pixel = int(0.5*(np.argmin(abs(x2_top_profile - 0.5)) + np.argmin(abs(x2_bottom_profile - 0.5))) + image.shape[1]/2)
 
     #make a figure showing defined edges/BBs
     img = deepcopy(image)
@@ -203,114 +212,29 @@ def lrfc(image_path, zoom_factor=3):
 
     #make plot of results
 
-    fig1, ax1 = plt.subplots(figsize=(10,10))
-    ax1.imshow(image, cmap="plasma")    #plotting the image with identified points/edges
-    ax1.imshow(masked_negative, cmap="cool")
-
-
-    #now make plot showing rad/light field crosshair displacements
-    def get_color(value, tol=0.5, act=1):
-        if abs(value) < tol:
-            return 'green'
-        elif abs(value) <= act:
-            return 'orange'
-        else:
-            return 'red'
-    fig2, ax = plt.subplots(nrows=2,ncols=2, figsize=(15,10), gridspec_kw={'width_ratios': [1, 2]})
-    #left side of subplot has the values, like in pips pro
-    ax[0,0].axis('off')  
-    ax[0,0].set_title("Radiation Light Field Displacements", loc='left', fontsize=10)
-
-    # Radiation Displacement
-    ax[0,0].text(0, 0.8, "Radiation Light Field Disp. (X/Y):", fontsize=10, ha='left', va='center')
-    ax[0,0].text(0.8, 0.8, f"{rad_light_disp[1]:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(rad_light_disp[1], tol=1, act=2))
-    ax[0,0].text(1.2, 0.8, f"{-rad_light_disp[0]:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(rad_light_disp[0], tol=1, act=2))
-
-    # Light Field Displacement
-    ax[0,0].text(0, 0.6, "Jaw/MLC Disp (Left/Right):", fontsize=10, ha='left', va='center')
-    ax[0,0].text(0.8, 0.6, f"{x1_disp:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(x1_disp, tol=1, act=2))
-    ax[0,0].text(1.2, 0.6, f"{x2_disp:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(x2_disp, tol=1, act=2))
-
-    ax[0,0].text(0, 0.4, "Jaw/MLC Disp (Top/Bottom):", fontsize=10, ha='left', va='center')
-    ax[0,0].text(0.8, 0.4, f"{y2_disp:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(y2_disp, tol=1, act=2))
-    ax[0,0].text(1.2, 0.4, f"{y1_disp:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(y1_disp, tol=1, act=2))
-
-    ax[0,0].text(0, 0.2, "Field Size:", fontsize=10, ha='left', va='center')
-    ax[0,0].text(0.8, 0.2, f"{field_size} X {field_size} cm", fontsize=10, ha='center', va='center', color="k")
-
-
-    ax[0,1].add_patch(plt.Rectangle((-1, -1), 2, 2, color='yellow', fill=False))
-    ax[0,1].add_patch(plt.Rectangle((-2, -2), 4, 4, color='red', fill=False))
-    ax[0,1].plot(rad_light_disp[1], -rad_light_disp[0], 'g+', markersize=8, label='Radiation Light Field Displacement')
-
-    # Add crosshairs for visualization
-    ax[0,1].axhline(0, color='black', linewidth=1)  # Horizontal line
-    ax[0,1].axvline(0, color='black', linewidth=1)  # Vertical line
-
-    # Set axis limits
-    ax[0,1].set_xlim([-2.5, 2.5])
-    ax[0,1].set_ylim([-2.5, 2.5])
-
-    # Add labels, grid, and legend
-    ax[0,1].set_xticks([-1, 0, 1])
-    ax[0,1].set_yticks([-1, 0, 1])
-    ax[0,1].set_xlabel('X Displacement (mm)')
-    ax[0,1].set_ylabel('Y Displacement (mm)')
-    ax[0,1].legend(loc='upper left', bbox_to_anchor=(1, 1))
-    ax[0,1].set_aspect('equal')
-
-
-    #left side of subplot has the values, like in pips pro
-    ax[1,0].axis('off')  
-    ax[1,0].set_title("Crosshair Displacements", loc='left', fontsize=10)
-
-    # Radiation Displacement
-    ax[1,0].text(0, 0.8, "Radiation Crosshair Disp. (X/Y):", fontsize=10, ha='left', va='center')
-    ax[1,0].text(0.8, 0.8, f"{rad_displacement[1]:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(rad_displacement[1]))
-    ax[1,0].text(1.2, 0.8, f"{-rad_displacement[0]:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(rad_displacement[0]))
-
-    # Light Field Displacement
-    ax[1,0].text(0, 0.6, "Light Field Crosshair Disp. (X/Y):", fontsize=10, ha='left', va='center')
-    ax[1,0].text(0.8, 0.6, f"{light_disp[1]:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(light_disp[1]))
-    ax[1,0].text(1.2, 0.6, f"{-light_disp[0]:.2f} mm", fontsize=10, ha='center', va='center', color=get_color(light_disp[0]))
-
-
-    ax[1,1].add_patch(plt.Rectangle((-0.5, -0.5), 1, 1, color='yellow', fill=False))
-    ax[1,1].add_patch(plt.Rectangle((-1, -1), 2, 2, color='red', fill=False))
-    ax[1,1].plot(rad_displacement[1], -rad_displacement[0], 'bo', markersize=8, label='Radiation Crosshair Displacement')
-    ax[1,1].plot(light_disp[1], -light_disp[0], 'rX', markersize=8, label='Light Field Crosshair Displacement')
-
-    # Add crosshairs for visualization
-    ax[1,1].axhline(0, color='black', linewidth=1)  # Horizontal line
-    ax[1,1].axvline(0, color='black', linewidth=1)  # Vertical line
-
-    # Set axis limits
-    ax[1,1].set_xlim([-1.5, 1.5])
-    ax[1,1].set_ylim([-1.5, 1.5])
-
-    # Add labels, grid, and legend
-    ax[1,1].set_xticks([-1, 0, 1])
-    ax[1,1].set_yticks([-1, 0, 1])
-    ax[1,1].set_xlabel('X Displacement (mm)')
-    ax[1,1].set_ylabel('Y Displacement (mm)')
-    ax[1,1].legend(loc='upper left', bbox_to_anchor=(1, 1))
-    ax[1,1].set_aspect('equal')
-
-    #plt.show()
-
-
-
-
-
-    return points, fig1, fig2
+    return points
 
 
 if __name__ == "__main__":
     #image_path = os.path.join(os.getcwd(),"u4_lrfc_nov4","6101515106_1510-000.dcm")
-    image_path = os.path.join(os.getcwd(), f"U{4}_lrfc_post_dec06","file-001.dcm")
+    #image_path = os.path.join("U:\Profile\Desktop\Abbotsford_Physics_Residency\Projects\lrfc_winlutz_flood\lrfc_u2","-7.5_7.5_-7.5_7.5.dcm")
 
     # plt.imshow(image)
     # plt.show()
 
-    lrfc(image_path, zoom_factor=3)
-    plt.show()
+    for unit in range(1,5):
+        print(f"Unit {unit}:")
+        for folder in [os.path.join(os.getcwd(), "pipspro_comparisons", f"u{unit}_lrfc_dec24"),os.path.join(os.getcwd(), "pipspro_comparisons", f"u{unit}_lrfc_nov24")]:
+            print(folder)
+            for energy in sorted(os.listdir(folder)):
+                if energy != "6x":
+                    continue
+                print(f"Energy: {energy}")
+                for file in os.listdir(os.path.join(folder, energy)):
+                    if "10" not in file:
+                        continue
+                    print(f"File: {file}")
+                    image_path = os.path.join(folder, energy, file)
+                    print(file)
+                    points, fig, fig2 = lrfc(image_path, zoom_factor=3)
+                    plt.show()
