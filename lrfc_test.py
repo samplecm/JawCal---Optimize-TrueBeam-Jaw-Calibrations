@@ -122,11 +122,23 @@ def lrfc(image_path, zoom_factor=3):
     x2_top_profile = image[int(top_right_bb[0]), int(image.shape[1]/2):]  
     x2_bottom_profile = image[int(bottom_right_bb[0]), int(image.shape[1]/2):]
     
+    x1_profile = image[int(image.shape[0]/2)-100:int(image.shape[0]/2)+100, :int(image.shape[1]/2)] 
+    x2_profile = image[int(image.shape[0]/2)-100:int(image.shape[0]/2)+100, int(image.shape[1]/2):]
+    y1_profile = image[int(image.shape[0]/2):, int(image.shape[1]/2)-100:int(image.shape[1]/2)+100]  
+    y2_profile = image[:int(image.shape[0]/2), int(image.shape[1]/2)-100:int(image.shape[1]/2)+100]  
+
+
+    #np.mean(np.argmin(abs(y1_profile - 0.5), axis=1))
+    y1_pixel = np.mean(np.argmin(abs(y1_profile - 0.5), axis=0)) + image.shape[0]/2
+    y2_pixel = np.mean(np.argmin(abs(y2_profile - 0.5), axis=0))
+    x1_pixel = np.mean(np.argmin(abs(x1_profile - 0.5), axis=1))
+    x2_pixel = np.mean(np.argmin(abs(x2_profile - 0.5), axis=1)) + image.shape[1]/2
+
     # Find the location of jaw edges using the averaged profiles.
-    y1_pixel = int(0.5*(np.argmin(abs(y1_left_profile - 0.5)) + np.argmin(abs(y1_right_profile - 0.5)))+ image.shape[0]/2)
-    y2_pixel = int(0.5*(np.argmin(abs(y2_left_profile - 0.5)) + np.argmin(abs(y2_right_profile - 0.5)))) 
-    x1_pixel = int(0.5*(np.argmin(abs(x1_top_profile - 0.5))  +np.argmin(abs(x1_bottom_profile - 0.5))))
-    x2_pixel = int(0.5*(np.argmin(abs(x2_top_profile - 0.5)) + np.argmin(abs(x2_bottom_profile - 0.5))) + image.shape[1]/2)
+    # y1_pixel = int(0.5*(np.argmin(abs(y1_left_profile - 0.5)) + np.argmin(abs(y1_right_profile - 0.5)))+ image.shape[0]/2)
+    # y2_pixel = int(0.5*(np.argmin(abs(y2_left_profile - 0.5)) + np.argmin(abs(y2_right_profile - 0.5)))) 
+    # x1_pixel = int(0.5*(np.argmin(abs(x1_top_profile - 0.5))  +np.argmin(abs(x1_bottom_profile - 0.5))))
+    # x2_pixel = int(0.5*(np.argmin(abs(x2_top_profile - 0.5)) + np.argmin(abs(x2_bottom_profile - 0.5))) + image.shape[1]/2)
 
     #make a figure showing defined edges/BBs
     img = deepcopy(image)
