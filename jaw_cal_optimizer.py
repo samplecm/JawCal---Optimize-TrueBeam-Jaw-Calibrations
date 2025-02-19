@@ -91,7 +91,7 @@ def which_jaw_measuring(jaws_x, jaws_y):
     elif round(abs(jaws_y[1])) != 120:
         return "y2"
 
-def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal_cal,epid_position=1.18):
+def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal_cal,epid_position=1.086):
     #this function finds the epid pixels corresponding to each jaw position in img_dict, and then fits a curve to those pixel values with the jaw encoder readouts
 
     encoder_dic = define_encoder_dict(unit_num, date)   #initialize dictionary which will hold jaw positions, encoders, pixels
@@ -151,37 +151,84 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
 
 
     
-    #now want to fit cubic functions of each jaws pixel vs encoder value. 
+    #now want to fit cubic functions of each jaws pixel vs encoder value. We will fit a curve in region around jaw=1cm, jaw=19 cm, and jaw = 5-9 cm
     fig, ax = plt.subplots(nrows=4, ncols=1)
     for j, jaw in enumerate(["x1", "x2", "y1", "y2"]):
-        encoders = []
-        pixels = []
-        for val in encoder_dic[jaw].keys():
+
+        encoders_low = []  #encoders in the region around 1 cm 
+        pixels_low = []
+
+        encoders_mid = [] #encoders in the region around 5-9 cm
+        pixels_mid = []
+
+        encoders_high = [] #encoders in the region around 19 cm.
+        pixels_high = []
+
+        encoders = []  #list of all encoder values
+
+        for val in encoder_dic[jaw].keys():    #go through all encoder values/jaw positions from spreadsheet and find the pixel location of jaw for each. Sort by location.
             
             if encoder_dic[jaw][val]["pixel"] == -100:   #if still at default value, image wasn't found at this position
                 continue
-            encoders.append(encoder_dic[jaw][val]["encoder"])
-            pixels.append(encoder_dic[jaw][val]["pixel"])
 
-        encoders = np.array(encoders)
-        pixels = np.array(pixels)
+            encoders.append(encoder_dic[jaw][val]["encoder"]) 
+
+            if float(val) <= 2:
+                encoders_low.append(encoder_dic[jaw][val]["encoder"])
+                pixels_low.append(encoder_dic[jaw][val]["pixel"])
+
+            elif float(val) <= 17:
+                encoders_mid.append(encoder_dic[jaw][val]["encoder"])
+                pixels_mid.append(encoder_dic[jaw][val]["pixel"])
+
+            else: 
+                encoders_high.append(encoder_dic[jaw][val]["encoder"])
+                pixels_high.append(encoder_dic[jaw][val]["pixel"])
+
+        encoders_low = np.array(encoders_low)
+        pixels_low = np.array(pixels_low)
+
+        encoders_mid = np.array(encoders_mid)
+        pixels_mid = np.array(pixels_mid)
+
+        encoders_high = np.array(encoders_high)
+        pixels_high = np.array(pixels_high)
 
         #now want a cubic fit to the data:
-        fit = np.polyfit(pixels,encoders,deg=3)
-        print(f"Polynomial fit coefficients: {fit}")
+        fit_low = np.polyfit(pixels_low,encoders_low,deg=3)
+        fit_mid = np.polyfit(pixels_mid,encoders_mid,deg=3)
+        fit_high = np.polyfit(pixels_high,encoders_high,deg=3)
 
-        #plot:
-        pixels_fit = np.linspace(np.amin(pixels), np.amax(pixels),200)
-        fit_points = fit[0]*pixels_fit**3 + fit[1]*pixels_fit**2 + fit[2]*pixels_fit + fit[3]
+        print(f"Polynomial fit coefficients low: {fit_low}")
+        print(f"Polynomial fit coefficients mid: {fit_mid}")
+        print(f"Polynomial fit coefficients high: {fit_high}")
 
-        ax[j].scatter(pixels, encoders, c="salmon")
-        ax[j].plot(pixels_fit, fit_points, marker=None, c="mediumturquoise")
+        #make arrays to plot the curves with:
+        pixels_fit_low = np.linspace(np.amin(pixels_low), np.amax(pixels_low),200)
+        pixels_fit_mid = np.linspace(np.amin(pixels_mid), np.amax(pixels_mid),200)
+        pixels_fit_high = np.linspace(np.amin(pixels_high), np.amax(pixels_high),200)
+
+        #define the fit points for plotting.
+        fit_points_low = fit_low[0]*pixels_fit_low**3 + fit_low[1]*pixels_fit_low**2 + fit_low[2]*pixels_fit_low + fit_low[3]
+        fit_points_mid = fit_mid[0]*pixels_fit_mid**3 + fit_mid[1]*pixels_fit_mid**2 + fit_mid[2]*pixels_fit_mid + fit_mid[3]
+        fit_points_high = fit_high[0]*pixels_fit_high**3 + fit_high[1]*pixels_fit_high**2 + fit_high[2]*pixels_fit_high + fit_high[3]
+
+        ax[j].scatter(pixels_low, encoders_low, c="salmon")
+        ax[j].plot(pixels_fit_low, fit_points_low, marker=None, c="mediumturquoise")
+
+        ax[j].scatter(pixels_mid, encoders_mid, c="violet")
+        ax[j].plot(pixels_fit_mid, fit_points_mid, marker=None, c="mediumturquoise")
+
+        ax[j].scatter(pixels_high, encoders_high, c="lightgreen")
+        ax[j].plot(pixels_fit_high, fit_points_high, marker=None, c="mediumturquoise")
+
         ax[j].set_xlabel("EPID Pixel")
         ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
 
         #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
         iso = find_bead_location(iso_img, round_final=False, zoom_size=3) #get unrounded iso
-        p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=epid_position)
+        fits = [fit_low, fit_mid, fit_high]
+        p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fits, epid_position=epid_position)
         if j == 0:
             ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
         if j == 1:
@@ -193,54 +240,54 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_cubic"))
 
 
-    #now fit a linear curve
-    fig, ax = plt.subplots(nrows=4, ncols=1)
-    for j, jaw in enumerate(["x1", "x2", "y1", "y2"]):
-        encoders = []
-        pixels = []
-        for val in encoder_dic[jaw].keys():
+    # #now fit a linear curve
+    # fig, ax = plt.subplots(nrows=4, ncols=1)
+    # for j, jaw in enumerate(["x1", "x2", "y1", "y2"]):
+    #     encoders = []
+    #     pixels = []
+    #     for val in encoder_dic[jaw].keys():
             
-            if encoder_dic[jaw][val]["pixel"] == -100:   #if still at default value, image wasn't found at this position
-                continue
-            encoders.append(encoder_dic[jaw][val]["encoder"])
-            pixels.append(encoder_dic[jaw][val]["pixel"])
+    #         if encoder_dic[jaw][val]["pixel"] == -100:   #if still at default value, image wasn't found at this position
+    #             continue
+    #         encoders.append(encoder_dic[jaw][val]["encoder"])
+    #         pixels.append(encoder_dic[jaw][val]["pixel"])
 
-        encoders = np.array(encoders)
-        pixels = np.array(pixels)
+    #     encoders = np.array(encoders)
+    #     pixels = np.array(pixels)
 
-        #now want a cubic fit to the data:
-        fit = np.polyfit(pixels,encoders,deg=1)
-        print(f"Polynomial fit coefficients: {fit}")
+    #     #now want a cubic fit to the data:
+    #     fit = np.polyfit(pixels,encoders,deg=1)
+    #     print(f"Polynomial fit coefficients: {fit}")
 
-        #plot:
-        pixels_fit = np.linspace(np.amin(pixels), np.amax(pixels),200)
-        fit_points = fit[0]*pixels_fit + fit[1]
+    #     #plot:
+    #     pixels_fit = np.linspace(np.amin(pixels), np.amax(pixels),200)
+    #     fit_points = fit[0]*pixels_fit + fit[1]
 
-        ax[j].scatter(pixels, encoders, c="salmon")
-        ax[j].plot(pixels_fit, fit_points, marker=None, c="mediumturquoise")
-        ax[j].set_xlabel("EPID Pixel")
-        ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
+    #     ax[j].scatter(pixels, encoders, c="salmon")
+    #     ax[j].plot(pixels_fit, fit_points, marker=None, c="mediumturquoise")
+    #     ax[j].set_xlabel("EPID Pixel")
+    #     ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
 
-        #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
-        iso = find_bead_location(iso_img, round_final=False, zoom_size=3) #get unrounded iso
-        p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=epid_position)
-        if j == 0:
-            ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-        if j == 1:
-            ax[j].text(2250, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-        if j == 2:
-            ax[j].text(2250,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-        if j == 3:
-            ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-    fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_linear"))
+    #     #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
+    #     iso = find_bead_location(iso_img, round_final=False, zoom_size=3) #get unrounded iso
+    #     p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=epid_position)
+    #     if j == 0:
+    #         ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+    #     if j == 1:
+    #         ax[j].text(2250, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+    #     if j == 2:
+    #         ax[j].text(2250,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+    #     if j == 3:
+    #         ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+    # fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_linear"))
     
         
     return
 
-def predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=1.18):
+def predict_opt_cal_locations(iso, jaw, optimal_cal, fits, epid_position=1.18):
     pixel_distance = 0.336 / epid_position / 3
     #this function returns the encoder values of the jaw calibration positions (1,5,9,19) calculated relative to optimal origin
-
+    fit_low, fit_mid, fit_high = fits
     #first get the jaw positions in pixels, relative to origin.
     if jaw == "x1":
         origin = iso[1] - optimal_cal[0]/(pixel_distance)   #optimal_cal in millimetres
@@ -266,16 +313,16 @@ def predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=1.18):
         p5 = origin - 50*(1/pixel_distance)
         p9 = origin - 90*(1/pixel_distance)
         p19 = origin - 190*(1/pixel_distance)
-    if len(fit) == 4:
-        p1 = fit[0]*p1**3 + fit[1]*p1**2 + fit[2]*p1 + fit[3]
-        p5 = fit[0]*p5**3 + fit[1]*p5**2 + fit[2]*p5 + fit[3]
-        p9 = fit[0]*p9**3 + fit[1]*p9**2 + fit[2]*p9 + fit[3]
-        p19 = fit[0]*p19**3 + fit[1]*p19**2 + fit[2]*p19 + fit[3]
-    elif len(fit) == 2:
-        p1 = fit[0]*p1 + fit[1]
-        p5 = fit[0]*p5 + fit[1]
-        p9 = fit[0]*p9 + fit[1]
-        p19 = fit[0]*p19 + fit[1]
+    if len(fits[0]) == 4:
+        p1 = fit_low[0]*p1**3 + fit_low[1]*p1**2 + fit_low[2]*p1 + fit_low[3]
+        p5 = fit_mid[0]*p5**3 + fit_mid[1]*p5**2 + fit_mid[2]*p5 + fit_mid[3]
+        p9 = fit_mid[0]*p9**3 + fit_mid[1]*p9**2 + fit_mid[2]*p9 + fit_mid[3]
+        p19 = fit_high[0]*p19**3 + fit_high[1]*p19**2 + fit_high[2]*p19 + fit_high[3]
+    elif len(fits[0]) == 2:
+        p1 = fit_low[0]*p1 + fit_low[1]
+        p5 = fit_mid[0]*p5 + fit_mid[1]
+        p9 = fit_mid[0]*p9 + fit_mid[1]
+        p19 = fit_high[0]*p19 + fit_high[1]
 
     return [round(p1), round(p5), round(p9), round(p19)]
 
@@ -833,16 +880,16 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
                 if new_rad_disp_y < 0.4:            
                         lrfc_cost += 0#abs(new_rad_light_y)
                 elif new_rad_disp_y < 0.7:
-                    lrfc_cost += abs(new_rad_disp_y**2)
+                    lrfc_cost += abs(new_rad_disp_y*3)
                 else:
-                    lrfc_cost = abs(new_rad_disp_y**3) #huge cost, do not want an lrfc value out of action
+                    lrfc_cost = 100 #huge cost, do not want an lrfc value out of action
 
                 if new_rad_disp_x < 0.4: 
                         lrfc_cost += 0#abs(new_rad_light_x)
                 elif new_rad_disp_x < 0.7:
-                    lrfc_cost += abs(new_rad_disp_x*2)
+                    lrfc_cost += abs(new_rad_disp_x*3)
                 else:
-                    lrfc_cost = abs(new_rad_disp_x*5) #huge cost, do not want an lrfc value out of action
+                    lrfc_cost = 100 #huge cost, do not want an lrfc value out of action
             
                 #now calculate cost from lrfc jaw displacements
                 new_y1_disp = offsets[0][0]["y1"]#lrfc_jaw_disps[0] + disp_y1
@@ -856,7 +903,7 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
                     if abs(lrfc_jaw_disp) < 0.5:
                         lrfc_cost += lrfc_jaw_disp/4
                     elif abs(lrfc_jaw_disp) < 0.75:
-                        lrfc_cost += 2*lrfc_jaw_disp/4
+                        lrfc_cost += 3*lrfc_jaw_disp/4
                     else:
                         lrfc_cost += 100 #don't want to consider cases with large jaw displacement errors.
 
@@ -882,10 +929,10 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
     #calculating the new jaw offsets each time and subsequent cost function
     #the cost function will be stored for each iteration, and finally, the cal point giving the minimum cost will be returned
 
-    x1_iters = np.linspace(-0.75,0.75,31)
-    x2_iters = np.linspace(-0.75,0.75,31)
-    y1_iters = np.linspace(-0.75,0.75,21)
-    y2_iters = np.linspace(-0.75,0.75,21)
+    x1_iters = np.linspace(-0.5,0.5,31)
+    x2_iters = np.linspace(-0.5,0.5,31)
+    y1_iters = np.linspace(-0.5,0.5,21)
+    y2_iters = np.linspace(-0.5,0.5,21)
     cost_vals = np.zeros((31,31,21,21))    #save as 2d grid with first dimension = x, second dimension = y
 
     #so for each iteration, first calculate the new offsets after shifting each jaw by respective amount
@@ -1125,7 +1172,7 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
 
     return tuple((opt_offset_x1, opt_offset_x2, opt_offset_y1, opt_offset_y2)), new_offsets
 
-def predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=True, epid_position=1.18):
+def predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=True, epid_position=1.086):
 
     if not os.path.exists(os.path.join(os.getcwd(), f"U{unit_num}_Output")):
         os.mkdir(os.path.join(os.getcwd(), f"U{unit_num}_Output"))
@@ -1161,11 +1208,11 @@ def predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_
 #     a[i*10,i] = random.random()*0.5
 # vals = find_half_intensity_pixel(a)
 
-unit_num=2
+unit_num=3
 junction_priority=0.7
 optimize_junctions = True
-date="feb16"
-pre_or_post = "pre"
+date="feb18"
+pre_or_post = "post"
 epid_position = 1.086
 
 img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_{pre_or_post}_{date}")
