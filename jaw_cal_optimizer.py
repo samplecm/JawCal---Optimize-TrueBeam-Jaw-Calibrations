@@ -72,11 +72,11 @@ def round_to_point_five(x):
     #rounds value to nearest 0.5
     return round(round(2*x)/2,1)
 
-def normalize_by_top_median(img, num=10000):
+def normalize_by_top_median(img, num=20000):
     #this function normalizes an image by the median of the top num of pixels
     flattened = deepcopy(img).flatten()
     sorted_pixels = np.sort(flattened)[::-1]
-    hottest = sorted_pixels[:num]
+    hottest = sorted_pixels[20000:20000+num]    #don't use hottest 20,000 pixels (there can be errors with broken pixels)
     med=np.median(hottest)
     return  img / med
 
@@ -196,7 +196,7 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
 
         #now want a cubic fit to the data:
         fit_low = np.polyfit(pixels_low,encoders_low,deg=3)
-        fit_mid = np.polyfit(pixels_mid,encoders_mid,deg=3)
+        fit_mid = np.polyfit(pixels_mid,encoders_mid,deg=1)
         fit_high = np.polyfit(pixels_high,encoders_high,deg=3)
 
         print(f"Polynomial fit coefficients low: {fit_low}")
@@ -204,13 +204,13 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
         print(f"Polynomial fit coefficients high: {fit_high}")
 
         #make arrays to plot the curves with:
-        pixels_fit_low = np.linspace(np.amin(pixels_low), np.amax(pixels_low),200)
-        pixels_fit_mid = np.linspace(np.amin(pixels_mid), np.amax(pixels_mid),200)
-        pixels_fit_high = np.linspace(np.amin(pixels_high), np.amax(pixels_high),200)
+        pixels_fit_low = np.linspace(np.amin(pixels_low), np.amax(pixels_low),300)
+        pixels_fit_mid = np.linspace(np.amin(pixels_mid), np.amax(pixels_mid),300)
+        pixels_fit_high = np.linspace(np.amin(pixels_high), np.amax(pixels_high),300)
 
         #define the fit points for plotting.
         fit_points_low = fit_low[0]*pixels_fit_low**3 + fit_low[1]*pixels_fit_low**2 + fit_low[2]*pixels_fit_low + fit_low[3]
-        fit_points_mid = fit_mid[0]*pixels_fit_mid**3 + fit_mid[1]*pixels_fit_mid**2 + fit_mid[2]*pixels_fit_mid + fit_mid[3]
+        fit_points_mid = fit_mid[0]*pixels_fit_mid + fit_mid[1]
         fit_points_high = fit_high[0]*pixels_fit_high**3 + fit_high[1]*pixels_fit_high**2 + fit_high[2]*pixels_fit_high + fit_high[3]
 
         ax[j].scatter(pixels_low, encoders_low, c="salmon")
@@ -230,57 +230,16 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
         fits = [fit_low, fit_mid, fit_high]
         p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fits, epid_position=epid_position)
         if j == 0:
-            ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].title.set_text(f"p1: {p1}, p9: {p9}, p19: {p19}")
         if j == 1:
-            ax[j].text(2250, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].title.set_text(f"p1: {p1}, p9: {p9}, p19: {p19}")
         if j == 2:
-            ax[j].text(2250,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].title.set_text(f"p1: {p1}, p5: {p5}, p19: {p19}")
         if j == 3:
-            ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
+            ax[j].title.set_text(f"p1: {p1}, p5: {p5}, p19: {p19}")
+
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_cubic"))
-
-
-    # #now fit a linear curve
-    # fig, ax = plt.subplots(nrows=4, ncols=1)
-    # for j, jaw in enumerate(["x1", "x2", "y1", "y2"]):
-    #     encoders = []
-    #     pixels = []
-    #     for val in encoder_dic[jaw].keys():
-            
-    #         if encoder_dic[jaw][val]["pixel"] == -100:   #if still at default value, image wasn't found at this position
-    #             continue
-    #         encoders.append(encoder_dic[jaw][val]["encoder"])
-    #         pixels.append(encoder_dic[jaw][val]["pixel"])
-
-    #     encoders = np.array(encoders)
-    #     pixels = np.array(pixels)
-
-    #     #now want a cubic fit to the data:
-    #     fit = np.polyfit(pixels,encoders,deg=1)
-    #     print(f"Polynomial fit coefficients: {fit}")
-
-    #     #plot:
-    #     pixels_fit = np.linspace(np.amin(pixels), np.amax(pixels),200)
-    #     fit_points = fit[0]*pixels_fit + fit[1]
-
-    #     ax[j].scatter(pixels, encoders, c="salmon")
-    #     ax[j].plot(pixels_fit, fit_points, marker=None, c="mediumturquoise")
-    #     ax[j].set_xlabel("EPID Pixel")
-    #     ax[j].set_ylabel(f"{jaw} Jaw Encoder Value")
-
-    #     #also get the predicted location of the locations 1,5,9,19 using the optimal calibration point as the origin
-    #     iso = find_bead_location(iso_img, round_final=False, zoom_size=3) #get unrounded iso
-    #     p1, p5, p9, p19 = predict_opt_cal_locations(iso, jaw, optimal_cal, fit, epid_position=epid_position)
-    #     if j == 0:
-    #         ax[j].text(100, np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-    #     if j == 1:
-    #         ax[j].text(2250, np.mean(encoders),f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-    #     if j == 2:
-    #         ax[j].text(2250,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-    #     if j == 3:
-    #         ax[j].text(100,  np.mean(encoders), f"p1: {p1}, p5: {p5}, p9: {p9}, p19: {p19}")
-    # fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_linear"))
-    
+    # plt.show()
         
     return
 
@@ -313,16 +272,12 @@ def predict_opt_cal_locations(iso, jaw, optimal_cal, fits, epid_position=1.18):
         p5 = origin - 50*(1/pixel_distance)
         p9 = origin - 90*(1/pixel_distance)
         p19 = origin - 190*(1/pixel_distance)
-    if len(fits[0]) == 4:
-        p1 = fit_low[0]*p1**3 + fit_low[1]*p1**2 + fit_low[2]*p1 + fit_low[3]
-        p5 = fit_mid[0]*p5**3 + fit_mid[1]*p5**2 + fit_mid[2]*p5 + fit_mid[3]
-        p9 = fit_mid[0]*p9**3 + fit_mid[1]*p9**2 + fit_mid[2]*p9 + fit_mid[3]
-        p19 = fit_high[0]*p19**3 + fit_high[1]*p19**2 + fit_high[2]*p19 + fit_high[3]
-    elif len(fits[0]) == 2:
-        p1 = fit_low[0]*p1 + fit_low[1]
-        p5 = fit_mid[0]*p5 + fit_mid[1]
-        p9 = fit_mid[0]*p9 + fit_mid[1]
-        p19 = fit_high[0]*p19 + fit_high[1]
+
+    p1 = fit_low[0]*p1**3 + fit_low[1]*p1**2 + fit_low[2]*p1 + fit_low[3]
+    p5 = fit_mid[0]*p5 + fit_mid[1]
+    p9 = fit_mid[0]*p9 + fit_mid[1]
+    p19 = fit_high[0]*p19**3 + fit_high[1]*p19**2 + fit_high[2]*p19 + fit_high[3]
+
 
     return [round(p1), round(p5), round(p9), round(p19)]
 
@@ -338,6 +293,10 @@ def sort_junc_img_dict(img_folder : str):
         img = normalize_by_top_median(img)
         img = gaussian_filter(img, sigma=3, order=0)    #smoothen the image
         img = zoom(img, zoom=2, order=3)
+
+        # plt.imshow(img, cmap="bone")
+        # plt.show()
+
         # jaws = img_meta[0x3002,0x0030].value[0][0x300A, 0x00B6][0]
         
         gantry_angle = round(float(img_meta[0x300A,0x011E].value)) % 360
@@ -759,9 +718,14 @@ def get_jaw_offsets(img_dict,isocentre):
 def find_bead_location(image: np.array, round_final=True, zoom_size=2):
     #here we simply determine the pixel location of the centre of the bead in the cubic phantom
     #img = (deepcopy(image) - np.amin(image)) / (np.amax(image) - np.amin(image))
-    img = deepcopy(image) / np.amax(image)
-    # plt.imshow(img)
+    img = normalize_by_top_median(deepcopy(image))
+
+    # img[img > 0.78] = 0.8   #for plotting
+    # img[img < 0.68] = 0.65
+
+    # plt.imshow(img, cmap="bone")
     # plt.show()
+
 
     #make outside borders large to make isocentre lowest value
     img[:,0:int(14*img.shape[1]/30)] = 1
@@ -774,9 +738,6 @@ def find_bead_location(image: np.array, round_final=True, zoom_size=2):
     pixel_list = sorted(img.flatten().tolist())
     pixel_100 = pixel_list[200*int(zoom_size/2)**2]
     img[img > pixel_100] = 0
-
-    # plt.imshow(img)
-    # plt.show()
 
     #now find the centre of mass of the remaining pixels 
     centre_pixels = np.nonzero(img)
@@ -830,9 +791,15 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
             lower_x2 = offsets[g][90]["x2"]
             junction_gap_0 = abs(lower_x2 + g0c90_x1)  #adding together will give the total error from perfect junction (whether it's a gap or an overlap)
             junction_gap_180 = abs(lower_x2 + g180c90_x1)
+            if junction_gap_0 > 0.9:
+                cost_junction += 2*junction_gap_0
+            else:
+                cost_junction += junction_gap_0
 
-            cost_junction += junction_gap_0
-            cost_junction += junction_gap_180
+            if junction_gap_180 > 0.9:
+                cost_junction += 2*junction_gap_180
+            else:
+                cost_junction += junction_gap_180
         #normalize junction cost by total number of relevant junctions (8)
         cost_junction /= 8
 
@@ -845,9 +812,9 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
             junction_gap_0 = lower_x2 + g0c90_x1  #adding together will give the total error from perfect junction (whether it's a gap or an overlap)
             junction_gap_180 = lower_x2 + g180c90_x1
             if junction_gap_0 < 0:
-                cost_cold_junction += 0.5*abs(junction_gap_0)
+                cost_cold_junction += abs(junction_gap_0)
             if junction_gap_180 < 0:
-                cost_cold_junction += 0.5*abs(junction_gap_180)
+                cost_cold_junction += abs(junction_gap_180)
 
         cost_cold_junction /= 8
 
@@ -882,14 +849,14 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
                 elif new_rad_disp_y < 0.7:
                     lrfc_cost += abs(new_rad_disp_y*3)
                 else:
-                    lrfc_cost = 100 #huge cost, do not want an lrfc value out of action
+                    lrfc_cost += abs(new_rad_disp_y*10) #huge cost, do not want an lrfc value out of action
 
                 if new_rad_disp_x < 0.4: 
                         lrfc_cost += 0#abs(new_rad_light_x)
                 elif new_rad_disp_x < 0.7:
                     lrfc_cost += abs(new_rad_disp_x*3)
                 else:
-                    lrfc_cost = 100 #huge cost, do not want an lrfc value out of action
+                    lrfc_cost += abs(new_rad_disp_x*10) #huge cost, do not want an lrfc value out of action
             
                 #now calculate cost from lrfc jaw displacements
                 new_y1_disp = offsets[0][0]["y1"]#lrfc_jaw_disps[0] + disp_y1
@@ -901,11 +868,11 @@ def calculate_cost(offsets : dict, old_offsets, use_lrfc, lrfc_vals,junction_pri
 
                 for lrfc_jaw_disp in new_lrfc_jaw_disps:
                     if abs(lrfc_jaw_disp) < 0.5:
-                        lrfc_cost += lrfc_jaw_disp/4
+                        lrfc_cost += lrfc_jaw_disp/4    #divide by 4 because there are 4 jaws
                     elif abs(lrfc_jaw_disp) < 0.75:
                         lrfc_cost += 3*lrfc_jaw_disp/4
                     else:
-                        lrfc_cost += 100 #don't want to consider cases with large jaw displacement errors.
+                        lrfc_cost += 10*lrfc_jaw_disp/4 #don't want to consider cases with large jaw displacement errors.
 
             lrfc_cost /= 2*len(lrfc_vals)
 
@@ -929,10 +896,10 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
     #calculating the new jaw offsets each time and subsequent cost function
     #the cost function will be stored for each iteration, and finally, the cal point giving the minimum cost will be returned
 
-    x1_iters = np.linspace(-0.5,0.5,31)
-    x2_iters = np.linspace(-0.5,0.5,31)
-    y1_iters = np.linspace(-0.5,0.5,21)
-    y2_iters = np.linspace(-0.5,0.5,21)
+    x1_iters = np.linspace(-0.49,0.49,31)
+    x2_iters = np.linspace(-0.49,0.49,31)
+    y1_iters = np.linspace(-0.49,0.49,21)
+    y2_iters = np.linspace(-0.49,0.49,21)
     cost_vals = np.zeros((31,31,21,21))    #save as 2d grid with first dimension = x, second dimension = y
 
     #so for each iteration, first calculate the new offsets after shifting each jaw by respective amount
@@ -992,8 +959,8 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
     
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 15))
     ax[0].imshow(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]], cmap='rainbow')
-    x_ticks = [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20]
-    y_ticks = [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20]
+    x_ticks = [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30]
+    y_ticks = [2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30]
     x_labels = []
     y_labels = []
     ax[0].set_xticks(x_ticks)
@@ -1008,16 +975,16 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
         y_labels.append(round(x2_iters[int(y_ticks[i])],1))
     ax[0].set_xticklabels(x_labels)
     ax[0].set_yticklabels(y_labels)
-    ax[0].set_xlabel("X1 Displacement from Iso (mm)")
-    ax[0].set_ylabel("X2 Displacement from Iso (mm)")
+    ax[0].set_xlabel("X1 Displacement from Iso (mm)", fontsize=16)
+    ax[0].set_ylabel("X2 Displacement from Iso (mm)", fontsize=16)
 
     #also show the cost values with colormap levelled
     vmax = np.amax(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]]) - 0.95 * (np.amax(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]]) - np.amin(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]]))
-    ax[1].imshow(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]], cmap='rainbow', vmax=vmax)
+    ax[1].imshow(np.log(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]]), cmap='rainbow')#.imshow(cost_vals[:,:,opt_offset_ind[0,2], opt_offset_ind[0,3]], cmap='rainbow', vmax=vmax)
     ax[1].set_xticklabels(x_labels)
     ax[1].set_yticklabels(y_labels)
-    ax[1].set_xlabel("X1 Displacement from Iso (mm)")
-    ax[1].set_ylabel("X2 Displacement from Iso (mm)")
+    ax[1].set_xlabel("X1 Displacement from Iso (mm)", fontsize=16)
+    ax[1].set_ylabel("X2 Displacement from Iso (mm)", fontsize=16)
 
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"optimal_x1_x2_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
     #plt.show()
@@ -1039,21 +1006,21 @@ def get_opt_origin(offsets : dict, jaw_offsets, junction_priority, unit_num, lrf
     ax[1].set_yticks(y_ticks)
 
     for i in range(len(x_ticks)):
-        x_labels.append(round(x1_iters[int(x_ticks[i])],1))
+        x_labels.append(round(y1_iters[int(x_ticks[i])],1))
     for i in range(len(y_ticks)):   
-        y_labels.append(round(x2_iters[int(y_ticks[i])],1))
+        y_labels.append(round(y2_iters[int(y_ticks[i])],1))
     ax[0].set_xticklabels(x_labels)
     ax[0].set_yticklabels(y_labels)
-    ax[0].set_xlabel("Y1 Displacement from Iso (mm)")
-    ax[0].set_ylabel("Y2 Displacement from Iso (mm)")
+    ax[0].set_xlabel("Y1 Displacement from Iso (mm)", fontsize=16)
+    ax[0].set_ylabel("Y2 Displacement from Iso (mm)", fontsize=16)
 
     #also show the cost values with colormap levelled
     vmax = np.amax(cost_vals[opt_offset_ind[0,0], opt_offset_ind[0,1],:,:]) - 0.95 * (np.amax(cost_vals[opt_offset_ind[0,0], opt_offset_ind[0,1],:,:]) - np.amin(cost_vals[opt_offset_ind[0,0], opt_offset_ind[0,1],:,:]))
-    ax[1].imshow(cost_vals[opt_offset_ind[0,0], opt_offset_ind[0,1],:,:], cmap='rainbow', vmax=vmax)
+    ax[1].imshow(np.log(cost_vals[opt_offset_ind[0,0], opt_offset_ind[0,1],:,:]), cmap='rainbow')#.imshow(cost_vals[opt_offset_ind[0,0], opt_offset_ind[0,1],:,:], cmap='rainbow', vmax=vmax)
     ax[1].set_xticklabels(x_labels)
     ax[1].set_yticklabels(y_labels)
-    ax[1].set_xlabel("Y1 Displacement from Iso (mm)")
-    ax[1].set_ylabel("Y2 Displacement from Iso (mm)")
+    ax[1].set_xlabel("Y1 Displacement from Iso (mm)", fontsize=16)
+    ax[1].set_ylabel("Y2 Displacement from Iso (mm)", fontsize=16)
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"optimal_y1_y2_{datetime.datetime.now().strftime("%Y-%m-%d_%H_%M_%S")}"))
     #plt.show()
     del fig
@@ -1212,7 +1179,7 @@ unit_num=3
 junction_priority=0.7
 optimize_junctions = True
 date="feb18"
-pre_or_post = "post"
+pre_or_post = "pre"
 epid_position = 1.086
 
 img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_{pre_or_post}_{date}")
