@@ -1174,23 +1174,32 @@ def predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_
 # for i in range(100):
 #     a[i*10,i] = random.random()*0.5
 # vals = find_half_intensity_pixel(a)
+def main():
+    print("////////////////////////////////////////////")
+    print("JawCal - TrueBeam Jaw Calibration Optimizer.")
+    print("////////////////////////////////////////////")
+    print("To begin optimizing your jaw calibration positions, please follow the instructions in the README file to properly name and sort your image data.")
+    print("Carefully respond to the following prompts:")
+    unit_num=input("Please enter the unit number, matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter '1')\n")
+    junction_priority=input("Please enter the junction priority to use in the cost function (between 0 and 1, larger = more emphasis on junction optimization, smaller = more emphasis on individual jaw positions.)\n")
+    date=input("Please enter the date, matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter 'feb22')\n")
+    pre_or_post = input("Please enter 'pre' or 'post', matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter 'post')\n")
+    epid_position = input("Please enter, as an absolute number, the position of the epid used when acquiring encoder correlation images. (eg. I've found ~8.6 aligns the isocentre cube at the isocentre.)\n")#1.086
+    epid_position += 100
+    epid_position /= 100
+    optimize_junctions = True
 
-unit_num=3
-junction_priority=0.7
-optimize_junctions = True
-date="feb18"
-pre_or_post = "pre"
-epid_position = 1.086
+    img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_{pre_or_post}_{date}")
+    lrfc_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_lrfc_{pre_or_post}_{date}")
 
-img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_{pre_or_post}_{date}")
-lrfc_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_lrfc_{pre_or_post}_{date}")
+    enc_img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_encoders_{date}")
+    enc_iso_img_path = os.path.join(os.getcwd(), "Images", f"U{unit_num}_iso_encoder_{date}.dcm")
 
-enc_img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_encoders_{date}")
-enc_iso_img_path = os.path.join(os.getcwd(), "Images", f"U{unit_num}_iso_encoder_{date}.dcm")
+    jaw_pos_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_jaws_{pre_or_post}_{date}")
 
-jaw_pos_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_jaws_{pre_or_post}_{date}")
+    predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=optimize_junctions, epid_position=epid_position)
 
-predict_optimal_encoders(date, unit_num, junction_priority, img_folder, jaw_pos_folder, enc_img_folder, enc_iso_img_path, lrfc_folder, optimize_junctions=optimize_junctions, epid_position=epid_position)
+    print("Program Finished Successfully")
 
-
-print("Program Finished Successfully")
+if __name__ == "__main__":
+    main()
