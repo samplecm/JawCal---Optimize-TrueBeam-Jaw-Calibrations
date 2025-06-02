@@ -53,7 +53,7 @@ def find_half_intensity_pixel(array):
 def define_encoder_dict(unit=2, date=None):
     #this function initializes the dictionary of jaw positions --> encoder values. 
     #it reads an encoder csv file and stores the encoder values in a dictionary with their approximate (machine - read) symmetric jaw value
-    encoder_file = os.path.join(os.getcwd(), "encoder_spreadsheets", f"u{unit}_encoders_{date}.csv")
+    encoder_file = os.path.join(os.getcwd(), "encoder_spreadsheets", f"U{unit}_encoders_{date}.csv")
     with open(encoder_file) as fp:
         reader = csv.reader(fp)
         csv_data_list = []
@@ -152,7 +152,7 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
 
     
     #now want to fit cubic functions of each jaws pixel vs encoder value. We will fit a curve in region around jaw=1cm, jaw=19 cm, and jaw = 5-9 cm
-    fig, ax = plt.subplots(nrows=4, ncols=1)
+    fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(12,16))
     for j, jaw in enumerate(["x1", "x2", "y1", "y2"]):
 
         encoders_low = []  #encoders in the region around 1 cm 
@@ -237,7 +237,7 @@ def fit_encoder_vs_pixel_funcs(date, img_folder, iso_img_path, unit_num, optimal
             ax[j].title.set_text(f"p1: {p1}, p5: {p5}, p19: {p19}")
         if j == 3:
             ax[j].title.set_text(f"p1: {p1}, p5: {p5}, p19: {p19}")
-
+    fig.tight_layout(pad=5)
     fig.savefig(os.path.join(os.getcwd(), f"U{unit_num}_Output", f"encoder_plots_cubic"))
     # plt.show()
         
@@ -1182,7 +1182,7 @@ def main():
     print("Carefully respond to the following prompts:")
     unit_num=input("Please enter the unit number, matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter '1')\n")
     junction_priority=input("Please enter the junction priority to use in the cost function (between 0 and 1, larger = more emphasis on junction optimization, smaller = more emphasis on individual jaw positions.)\n")
-    date=input("Please enter the date, matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter 'feb22')\n")
+    date=input("Please enter the date (MMDD), matching the one used when naming data folders. (eg. 'U1_jaws_post_0222' --> enter '0222')\n")
     pre_or_post = input("Please enter 'pre' or 'post', matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter 'post')\n")
     epid_position = input("Please enter, as an absolute number, the position of the epid used when acquiring encoder correlation images. (eg. I've found ~8.6 aligns the isocentre cube at the isocentre.)\n")#1.086
     epid_position += 100
