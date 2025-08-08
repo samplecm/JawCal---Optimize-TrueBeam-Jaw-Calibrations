@@ -1184,9 +1184,8 @@ def main():
     junction_priority=input("Please enter the junction priority to use in the cost function (between 0 and 1, larger = more emphasis on junction optimization, smaller = more emphasis on individual jaw positions.)\n")
     date=input("Please enter the date (MMDD), matching the one used when naming data folders. (eg. 'U1_jaws_post_0222' --> enter '0222')\n")
     pre_or_post = input("Please enter 'pre' or 'post', matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter 'post')\n")
-    epid_position = input("Please enter, as an absolute number, the position of the epid used when acquiring encoder correlation images. (eg. I've found ~8.6 aligns the isocentre cube at the isocentre.)\n")#1.086
-    epid_position += 100
-    epid_position /= 100
+    epid_position = 1.086
+
     optimize_junctions = True
 
     img_folder = os.path.join(os.getcwd(), "Images", f"U{unit_num}_{pre_or_post}_{date}")
@@ -1202,4 +1201,5 @@ def main():
     print("Program Finished Successfully")
 
 if __name__ == "__main__":
+
     main()
