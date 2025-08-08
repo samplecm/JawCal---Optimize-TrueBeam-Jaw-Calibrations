@@ -1181,7 +1181,7 @@ def main():
     print("To begin optimizing your jaw calibration positions, please follow the instructions in the README file to properly name and sort your image data.")
     print("Carefully respond to the following prompts:")
     unit_num=input("Please enter the unit number, matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter '1')\n")
-    junction_priority=input("Please enter the junction priority to use in the cost function (between 0 and 1, larger = more emphasis on junction optimization, smaller = more emphasis on individual jaw positions.)\n")
+    junction_priority=float(input("Please enter the junction priority to use in the cost function (between 0 and 1, larger = more emphasis on junction optimization, smaller = more emphasis on individual jaw positions.)\n"))
     date=input("Please enter the date (MMDD), matching the one used when naming data folders. (eg. 'U1_jaws_post_0222' --> enter '0222')\n")
     pre_or_post = input("Please enter 'pre' or 'post', matching the one used when naming data folders. (eg. 'U1_jaws_post_feb22' --> enter 'post')\n")
     epid_position = 1.086
@@ -1203,3 +1203,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
